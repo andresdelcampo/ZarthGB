@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "xnO/vJHBT7P7Ebz3yAaQvlNi+qKcBuuPHLnYqICdkXOiYgdeK+kIjSB5oaVEXsDRUHVUhqMdaV+2T6BcCdCh+A==",
+  "success": true,
+  "projectFilePath": "D:\\Downloads\\Retro\\Game Boy (GB, GBC)\\ZarthGB\\ZarthGB.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\adelc\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\5.0.17\\microsoft.netcore.app.host.win-x64.5.0.17.nupkg.sha512"
+  ],
+  "logs": []
+}

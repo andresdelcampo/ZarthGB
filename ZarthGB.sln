@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31613.86
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZarthGB", "ZarthGB.csproj", "{87C9C83D-080C-4620-87BC-1E152FB3E4AC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{87C9C83D-080C-4620-87BC-1E152FB3E4AC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87C9C83D-080C-4620-87BC-1E152FB3E4AC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87C9C83D-080C-4620-87BC-1E152FB3E4AC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87C9C83D-080C-4620-87BC-1E152FB3E4AC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5A886856-2E8F-4AAB-9100-97B0A4B1AE36}
+	EndGlobalSection
+EndGlobal

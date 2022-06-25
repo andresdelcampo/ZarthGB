@@ -1,0 +1,40 @@
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.exe
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.deps.json
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.runtimeconfig.json
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.runtimeconfig.dev.json
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.dll
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.pdb
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.csproj.AssemblyReference.cache
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.ZarthEmulator.resources
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.csproj.GenerateResource.cache
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.AssemblyInfoInputs.cache
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.AssemblyInfo.cs
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.csproj.CoreCompileInputs.cache
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.dll
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ref\ZarthGB.dll
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.pdb
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.genruntimeconfig.cache
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\bgbtest.gb
+C:\Users\adelc\source\repos\ZarthGB\bin\Debug\net5.0-windows\tetris.gb
+C:\Users\adelc\source\repos\ZarthGB\obj\Debug\net5.0-windows\refint\ZarthGB.dll
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\bgbtest.gb
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\tetris.gb
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.exe
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.deps.json
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.runtimeconfig.json
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.runtimeconfig.dev.json
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.dll
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\bin\Debug\net5.0-windows\ZarthGB.pdb
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.csproj.AssemblyReference.cache
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.ZarthEmulator.resources
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.csproj.GenerateResource.cache
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.GeneratedMSBuildEditorConfig.editorconfig
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.AssemblyInfoInputs.cache
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.AssemblyInfo.cs
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.csproj.CoreCompileInputs.cache
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.dll
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\refint\ZarthGB.dll
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.pdb
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ZarthGB.genruntimeconfig.cache
+D:\Downloads\Retro\Game Boy (GB, GBC)\ZarthGB\obj\Debug\net5.0-windows\ref\ZarthGB.dll
