@@ -101,13 +101,39 @@ namespace ZarthGB
         public int Ticks 
         {
             get => memory.Ticks;
-            private set => memory.Ticks = value;
+            private set
+            {
+                if (memory.TimerEnabled)
+                {
+                    int increment = value - memory.Ticks;
+                    for (int i = 0; i < increment; i++)
+                    {
+                        if ((memory.Ticks + i) % memory.TimerTick == 0)
+                        {
+                            int newCounterValue = memory[0xff05] + 1;
+                            memory[0xff05] = (byte) (newCounterValue & 0xFF);
+                            if (newCounterValue > 0xFF)
+                            {
+                                //Debug.Print($"allTimerCounters {allTimerCounters.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}, Ticks {memory.Timer2.ElapsedTicks}, freq {(Stopwatch.Frequency*allTimerCounters)/memory.Timer2.ElapsedTicks}");
+                                memory[0xff05] = memory[0xff06];
+                                if ((InterruptEnable & InterruptsTimer) > 0)
+                                {
+                                    timesTriggered++;
+                                    InterruptFlags |= InterruptsTimer;
+                                    //if (timesTriggered % 8 == 0 || memory.Timer2.ElapsedMilliseconds == 1000)
+                                        //Debug.Print($"timesTriggered {timesTriggered.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}");
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                memory.Ticks = value;   
+            }
         }
         private Stopwatch divStopwatch = new Stopwatch();
         private long divTick = Stopwatch.Frequency / 16384;
         
-        private long lastTimerTicks = 0;
-        private long allTimerCounters = 0;
         private long timesTriggered = 0;
         
         private int[] normalInstructionHalfTicks = {
@@ -172,45 +198,61 @@ namespace ZarthGB
 
         private void InterruptStep()
         {
-            if (InterruptMasterEnable && InterruptEnable != 0 && InterruptFlags != 0)
-            {
-                byte fire = (byte) (InterruptEnable & InterruptFlags);
-
-                if ((fire & InterruptsVblank) != 0)
+            if (InterruptMasterEnable || Halted)
+                if (InterruptEnable != 0 && InterruptFlags != 0)
                 {
-                    InterruptFlags = (byte) (InterruptFlags & ~InterruptsVblank);
-                    Halted = false;
-                    Vblank();
-                }
+                    byte fire = (byte) (InterruptEnable & InterruptFlags);
 
-                if ((fire & InterruptsLcdstat) != 0)
-                {
-                    InterruptFlags = (byte) (InterruptFlags & ~InterruptsLcdstat);
-                    Halted = false;
-                    LcdStat();
-                }
+                    if ((fire & InterruptsVblank) != 0)
+                    {
+                        Halted = false;
+                        if (InterruptMasterEnable)
+                        {
+                            InterruptFlags = (byte) (InterruptFlags & ~InterruptsVblank);
+                            Vblank();
+                        }
+                    }
 
-                if ((fire & InterruptsTimer) != 0)
-                {
-                    InterruptFlags = (byte) (InterruptFlags & ~InterruptsTimer);
-                    Halted = false;
-                    Timer();
-                }
+                    if ((fire & InterruptsLcdstat) != 0)
+                    {
+                        Halted = false;
+                        if (InterruptMasterEnable)
+                        {
+                            InterruptFlags = (byte)(InterruptFlags & ~InterruptsLcdstat);
+                            LcdStat();
+                        }
+                    }
 
-                if ((fire & InterruptsSerial) != 0)
-                {
-                    InterruptFlags = (byte) (InterruptFlags & ~InterruptsSerial);
-                    Halted = false;
-                    Serial();
-                }
+                    if ((fire & InterruptsTimer) != 0)
+                    {
+                        Halted = false;
+                        if (InterruptMasterEnable)
+                        {
+                            InterruptFlags = (byte)(InterruptFlags & ~InterruptsTimer);
+                            Timer();
+                        }
+                    }
 
-                if ((fire & InterruptsJoypad) != 0)
-                {
-                    InterruptFlags = (byte) (InterruptFlags & ~InterruptsJoypad);
-                    Halted = false;
-                    Joypad();
+                    if ((fire & InterruptsSerial) != 0)
+                    {
+                        Halted = false;
+                        if (InterruptMasterEnable)
+                        {
+                            InterruptFlags = (byte) (InterruptFlags & ~InterruptsSerial);
+                            Serial();
+                        }
+                    }
+
+                    if ((fire & InterruptsJoypad) != 0)
+                    {
+                        Halted = false;
+                        if (InterruptMasterEnable)
+                        {
+                            InterruptFlags = (byte)(InterruptFlags & ~InterruptsJoypad);
+                            Joypad();
+                        }
+                    }
                 }
-            }
         }
 
         private void Vblank()
@@ -304,43 +346,11 @@ namespace ZarthGB
                 memory.IncrementDiv();
             }
 
-            // Configurable Timer
-            if (memory.Timer.IsRunning && (memory.Timer.ElapsedTicks - lastTimerTicks) > memory.TimerTick)
+            if (Stopped || Halted)
             {
-                double currentTicks = memory.Timer.ElapsedTicks;
-                
-                // Faster but still heavy, only triggers interrupts about 600 times a second (should be 1000)
-                int timesToAdd = 0;
-                do
-                {
-                    timesToAdd++;
-                    lastTimerTicks += memory.TimerTick;
-                } while (currentTicks - lastTimerTicks > memory.TimerTick);
-
-                // Very precise, but too heavy, only triggers interrupts about 200 times a second
-                //long timesToAdd = (long)Math.Floor((currentTicks - lastTimerTicks) / memory.TimerTick);
-                allTimerCounters += timesToAdd;
-                //Debug.Print($"timesToAdd {timesToAdd.ToString()}");
-                //lastTimerTicks = (long) (allTimerCounters * memory.TimerTick);
-
-                int newCounterValue = memory[0xff05] + timesToAdd;
-                memory[0xff05] = (byte) (newCounterValue & 0xFF);
-                if (newCounterValue > 0xFF)
-                {
-                    //Debug.Print($"allTimerCounters {allTimerCounters.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}, Ticks {memory.Timer2.ElapsedTicks}, freq {(Stopwatch.Frequency*allTimerCounters)/memory.Timer2.ElapsedTicks}");
-                    memory[0xff05] = memory[0xff06];
-                    if ((InterruptEnable & InterruptsTimer) > 0)
-                    {
-                        timesTriggered++;
-                        InterruptMasterEnable = true;
-                        InterruptFlags |= InterruptsTimer;
-                        //if (timesTriggered % 16 == 0)
-                            //Debug.Print($"timesTriggered {timesTriggered.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}");
-                    }
-                }
+                Ticks += 4;
+                return;
             }
-            
-            if (Stopped || Halted) return;
 
             #region Tracing
             pcTrace[pcTracePtr++] = PC;
@@ -379,8 +389,6 @@ namespace ZarthGB
             byte opcode = ReadByte();
             Ticks += normalInstructionHalfTicks[opcode] << 1;
                 
-            //if (Steps % 100 == 0) 
-            //if (Steps > 20000 && PC > 0x0069)
             //Debug.Print($"Step={Steps} PC={PC:X4} OP={opcode:X2} A={A:X2} F={Flags:X2} B={B:X2} C={C:X2} D={D:X2} E={E:X2} H={H:X2} L={L:X2} SP={SP:X4}");
                 
             switch(opcode)
@@ -1025,7 +1033,11 @@ namespace ZarthGB
                     break;
                     
                 case 0x76: // HALT
-                    // Halt execution until interrupt occurs
+                    /*if (InterruptMasterEnable)
+                        Halted = true;      // Halt execution until interrupt occurs
+                    else    
+                        PC++;   // DMG issue skips one instruction when in DI
+                    */  // In theory this is the behavior, but if fails the tests
                     Halted = true;
                     break;
                     

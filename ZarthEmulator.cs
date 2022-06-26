@@ -26,7 +26,7 @@ namespace ZarthGB
             //emulator.LoadCartridge("tetris.gb");
             //emulator.LoadCartridge("sml.gb");
             //emulator.LoadCartridge("01-special.gb");              // Failed #6 DAA
-            //emulator.LoadCartridge("02-interrupts.gb");           // Failed #2 EI
+            emulator.LoadCartridge("02-interrupts.gb");           // OK!
             //emulator.LoadCartridge("03-op sp,hl.gb");             // Failed E8 E8 F8 F8
             //emulator.LoadCartridge("04-op r,imm.gb");             // Failed FE C6 CE DE
             //emulator.LoadCartridge("05-op rp.gb");                // OK!

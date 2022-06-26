@@ -9,9 +9,8 @@ namespace ZarthGB
         private byte[] memory;
         private byte[] cartridge;
         public int Ticks { get; set; }
-        public Stopwatch Timer { get; private set; } = new Stopwatch();
+        public bool TimerEnabled { get; private set; }
         public long TimerTick { get; private set; }
-        public Stopwatch Timer2 { get; private set; } = new Stopwatch();
         
         #region Keyboard
         public bool KeyUp { get; set; }
@@ -287,23 +286,19 @@ namespace ZarthGB
 		        // Configurable Timer
 		        else if (address == 0xff07)
 		        {
-			        long timerFrequency = 4096;
 			        switch (value & 0x03)
 			        {
-				        case 0: timerFrequency = 4096; break;	// 4096
-				        case 1: timerFrequency = 262144; break;	// 262144
-				        case 2: timerFrequency = 65536; break;	// 65536
-				        case 3: timerFrequency = 16384; break;	// 16384
+				        // Clock cycles: 4.19 MHz = 4.393.533,44 vs frequency (below)
+				        case 0: TimerTick = 1072; break;	// 4,096  KHz	-> 1072,64 clock cycles
+				        case 1: TimerTick = 17;   break;	// 262,144 KHz	-> 16,76
+				        case 2: TimerTick = 67;   break;	// 65,536  KHz	-> 67,04
+				        case 3: TimerTick = 268;  break;	// 16,384  KHz	-> 268,16
 			        }
-			        //TimerTick = Stopwatch.Frequency / timerFrequency;
 
 			        if ((value & 0x04) > 0)
-			        {
-				        Timer.Start();
-						Timer2.Start(); // Remove				        
-			        }
+				        TimerEnabled = true;
 			        else
-				        Timer.Stop();
+				        TimerEnabled = false;
 		        }
 
 		        // OAM DMA
