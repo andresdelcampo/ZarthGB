@@ -422,6 +422,7 @@ namespace ZarthGB
                     
                 case 0x07: // RLCA
                     A = Rlc(A);
+                    FlagZ = false;
                     break;
                     
                 case 0x08: // LD (nn), SP
@@ -454,6 +455,7 @@ namespace ZarthGB
                     
                 case 0x0F: // RRCA
                     A = Rrc(A);
+                    FlagZ = false;
                     break;
                     
                 case 0x10: // STOP
@@ -487,6 +489,7 @@ namespace ZarthGB
 
                 case 0x17: // RLA
                     A = Rl(A);
+                    FlagZ = false;
                     break;
                     
                 case 0x18: // JR n      // Verified OK - 01
@@ -520,6 +523,7 @@ namespace ZarthGB
                     
                 case 0x1F: // RRA
                     A = Rr(A);
+                    FlagZ = false;
                     break;
                     
                 case 0x20: // JR NZ, n
@@ -555,148 +559,30 @@ namespace ZarthGB
                     H = ReadByte();
                     break;
                     
-                case 0x27: // DAA
-                    /*int resultDAA = A;
-
-                    if (!FlagN)
-                    {
-                        if (FlagH || (resultDAA & 0xF) > 9)
-                            resultDAA += 0x06;
-                        if (FlagC || (resultDAA & 0xFF) > 0x9F)
-                            resultDAA += 0x60;
-                    }
-                    else
-                    {
-                        if (FlagC || (resultDAA & 0xFF) > 0x9F)
-                            resultDAA -= 0x60;
-                        if (FlagH || (resultDAA & 0xF) > 9)
-                            resultDAA = (resultDAA - 6) & 0xFF;
-                    }
-
-                    FlagH = false;
-                    FlagC = (resultDAA & 0x100) == 0x100;
-                    resultDAA &= 0xFF;
-                    FlagZ = resultDAA == 0;
-                    A = (byte) (resultDAA & 0xFF);
-                    */
-                    
-                    
-                    int prevA = A;
-                    bool prevFC = FlagC;
-                    bool prevFH = FlagH;
+                case 0x27: // DAA               // Verified OK - 01, 11
                     int resultDAA = A;
-
-                    if (A == 0x00 && !FlagC && FlagH && FlagN)
-                        PC = PC;
-
                     if (!FlagN)
                     {
-                        if (FlagH)
+                        if (FlagH || (resultDAA & 0xF) > 9)
                             resultDAA += 0x06;
-                        if ((resultDAA & 0xF) > 9)
-                            resultDAA += 0x06;
-                        if (FlagC)
-                            resultDAA += 0x60;
-                        if ((resultDAA & 0xFF) > 0x9F)
+                        if (FlagC || resultDAA > 0x9F)
                             resultDAA += 0x60;
                     }
                     else
                     {
-                        if (FlagC)
-                            resultDAA -= 0x60;
-                        if ((resultDAA & 0xFF) > 0x9F)
-                            resultDAA -= 0x60;
                         if (FlagH)
                             resultDAA = (resultDAA - 6) & 0xFF;
-                        if ((resultDAA & 0xF) > 9)
-                            resultDAA -= 0x06;
-                        if ((resultDAA & 0xFF) > 0x9F)
+                        if (FlagC)
                             resultDAA -= 0x60;
-                        if ((resultDAA & 0xF) > 9)
-                            resultDAA -= 0x06;
                     }
-
+                    FlagZ = false;
                     FlagH = false;
-                    FlagC = (resultDAA & 0x100) == 0x100;
+                    if ((resultDAA & 0x100) == 0x100)
+                        FlagC = true;
                     resultDAA &= 0xFF;
-                    FlagZ = resultDAA == 0;
+                    if (resultDAA == 0)
+                        FlagZ = true;
                     A = (byte) (resultDAA & 0xFF);
-
-                    if ((A & 0x0F) > 9 || (A & 0xF0) > 0x90)
-                        throw new InvalidOperationException("DAA screwed up.");
-                    
-                    /*
-                    int correction = 0;
-
-                    bool setFlagC = false;
-                    if (FlagH || (!FlagN && (A & 0xf) > 9)) {
-                        correction |= 0x6;
-                    }
-
-                    if (FlagC || (!FlagN && A > 0x99)) {
-                        correction |= 0x60;
-                        setFlagC = FlagC;
-                    }
-
-                    A = (byte) (A + (FlagN ? -correction : correction));
-
-                    A &= 0xff;
-
-                    FlagZ = A == 0;
-                    FlagH = false;
-                    FlagC = setFlagC;
-                    */
-                    
-                    
-                    /*
-                    int tmp = A;
-                    if (!FlagN) 
-                    {
-                        if (FlagH || (tmp & 0x0F) > 9 )
-                            tmp += 6;
-                        if (FlagC || tmp > 0x9F )
-                            tmp += 0x60;
-                    } 
-                    else 
-                    {
-                        if (FlagH) 
-                        {
-                            tmp -= 6;
-                            if (!FlagC)
-                                tmp &= 0xFF;
-                        }
-                        if (FlagC)
-                            tmp -= 0x60;
-                    }
-                    FlagH = false;
-                    //if ((tmp & 0x100) != 0)
-                        //FlagC = true;
-                    FlagC = (tmp & 0x100) != 0;
-                    A = (byte) (tmp & 0xFF);
-                    FlagZ = A == 0;
-                    */
-                    
-
-                    /*
-                    ushort bigA = A;
-                    if (FlagN)
-                    {
-                        if (FlagH)
-                            bigA = (ushort)((bigA - 0x06) & 0xFF);
-                        if (FlagC)
-                            bigA = (ushort)(bigA - 0x60);
-                    }
-                    else
-                    {
-                        if (FlagH || (bigA & 0x0F) > 9)
-                            bigA += 0x06;
-                        if (FlagC || bigA > 0x9F)
-                            bigA += 0x60;
-                    }
-                    A = (byte) bigA;
-                    FlagZ = A == 0;
-                    FlagH = false;
-                    FlagC = bigA >= 0x100;*/
                     break;
                     
                 case 0x28: // JR Z, n
@@ -1110,35 +996,35 @@ namespace ZarthGB
                     break;
                     
                 case 0x88: // ADC A, B
-                    Add(B, true);
+                    Adc(B);
                     break;
                     
                 case 0x89: // ADC A, C
-                    Add(C, true);
+                    Adc(C);
                     break;
                     
                 case 0x8A: // ADC A, D
-                    Add(D, true);
+                    Adc(D);
                     break;
                     
                 case 0x8B: // ADC A, E
-                    Add(E, true);
+                    Adc(E);
                     break;
                     
                 case 0x8C: // ADC A, H
-                    Add(H, true);
+                    Adc(H);
                     break;
                     
                 case 0x8D: // ADC A, L
-                    Add(L, true);
+                    Adc(L);
                     break;
                     
                 case 0x8E: // ADC A, (HL)
-                    Add(ReadByte(HL), true);
+                    Adc(ReadByte(HL));
                     break;
                     
                 case 0x8F: // ADC A, A
-                    Add(A, true);
+                    Adc(A);
                     break;
                     
                 case 0x90: // SUB A, B
@@ -1174,35 +1060,35 @@ namespace ZarthGB
                     break;
                     
                 case 0x98: // SBC A, B
-                    Sub(B, true);
+                    Sbc(B);
                     break;
                     
                 case 0x99: // SBC A, C
-                    Sub(C, true);
+                    Sbc(C);
                     break;
                     
                 case 0x9A: // SBC A, D
-                    Sub(D, true);
+                    Sbc(D);
                     break;
                     
                 case 0x9B: // SBC A, E
-                    Sub(E, true);
+                    Sbc(E);
                     break;
                     
                 case 0x9C: // SBC A, H
-                    Sub(H, true);
+                    Sbc(H);
                     break;
                     
                 case 0x9D: // SBC A, L
-                    Sub(L, true);
+                    Sbc(L);
                     break;
                     
                 case 0x9E: // SBC A, (HL)
-                    Sub(ReadByte(HL), true);
+                    Sbc(ReadByte(HL));
                     break;
                     
                 case 0x9F: // SBC A, A
-                    Sub(A, true);
+                    Sbc(A);
                     break;
                     
                 case 0xA0: // AND B
@@ -1422,7 +1308,7 @@ namespace ZarthGB
                     break;
                     
                 case 0xCE: // ADC A, n
-                    Add(ReadByte(), true);
+                    Adc(ReadByte());
                     break;
 
                 case 0xCF: // RST 08H
@@ -1513,7 +1399,7 @@ namespace ZarthGB
                 // 0xDD - Illegal
 
                 case 0xDE: // SBC A, n
-                    Sub(ReadByte(), true);
+                    Sbc(ReadByte());
                     break;
                     
                 case 0xDF: // RST 18H
@@ -1547,16 +1433,14 @@ namespace ZarthGB
                     Rst(0x20);
                     break;
                     
-                case 0xE8: // ADD SP, n
-                    var value = (ushort)(sbyte)ReadByte();
-                    var origSP = SP;
+                case 0xE8: // ADD SP, n         // Verified OK - 03
+                    var value = (sbyte)ReadByte();
                     var result = SP + value;
                     FlagZ = false;
                     FlagN = false;
-                    FlagC = (result & 0xFFFF0000) != 0;
-                    FlagH = (origSP & 0x0FFF) + (value & 0x0FFF) > 0x0FFF;
+                    FlagC = (((ushort)(sbyte)SP & 0xff) + (value & 0xff) & 0x100) != 0;
+                    FlagH = (((ushort)(sbyte)SP & 0x0f) + (value & 0x0f) & 0x10) != 0;
                     SP = (ushort) (result & 0xFFFF);
-                    Debug.Print($"SP={origSP:X4}, n={value:X2}, res={SP:X4}, C={FlagC}, H={FlagH}");
                     break;
 
                 case 0xE9: // JP (HL)
@@ -1610,14 +1494,13 @@ namespace ZarthGB
                     Rst(0x30);
                     break;
                     
-                case 0xF8: // LD HL, SP+n
-                    value = (ushort)(sbyte)ReadByte();
-                    origSP = SP;
+                case 0xF8: // LD HL, SP+n           // Verified OK - 03
+                    value = (sbyte)ReadByte();
                     result = SP + value;
                     FlagZ = false;
                     FlagN = false;
-                    FlagC = (result & 0xFFFF0000) != 0;
-                    FlagH = (origSP & 0x0FFF) + (value & 0x0FFF) > 0x0FFF;
+                    FlagC = (((ushort)(sbyte)SP & 0xff) + (value & 0xff) & 0x100) != 0;
+                    FlagH = (((ushort)(sbyte)SP & 0x0f) + (value & 0x0f) & 0x10) != 0;
                     HL = (ushort) (result & 0xFFFF);
                     break;
                     
@@ -2785,7 +2668,7 @@ namespace ZarthGB
             PC = lsbAddress;
         }
         
-        private byte Increment(byte value)
+        private byte Increment(byte value)      // Verified OK - 09
         {
             FlagH = (value & 0x0F) == 0x0F;
             value++;
@@ -2794,7 +2677,7 @@ namespace ZarthGB
             return value;
         }
         
-        private byte Decrement(byte value)
+        private byte Decrement(byte value)      // Verified OK - 09
         {
             FlagH = (value & 0x0F) == 0;
             value--;
@@ -2803,7 +2686,7 @@ namespace ZarthGB
             return value;
         }
         
-        private void And(byte value)
+        private void And(byte value)        // Verified OK - 09
         {
             A = (byte) (A & value);
             FlagZ = A == 0;
@@ -2812,7 +2695,7 @@ namespace ZarthGB
             FlagC = false;
         }
         
-        private void Or(byte value)
+        private void Or(byte value)         // Verified OK - 09
         {
             A = (byte) (A | value);
             FlagZ = A == 0;
@@ -2821,7 +2704,7 @@ namespace ZarthGB
             FlagC = false;
         }
         
-        private void Xor(byte value)
+        private void Xor(byte value)        // Verified OK - 09
         {
             A = (byte) (A ^ value);
             FlagZ = A == 0;
@@ -2830,24 +2713,43 @@ namespace ZarthGB
             FlagC = false;
         }
         
-        private void Add(byte value, bool carry = false)
+        private void Add(byte value)        // Verified OK - 09
         {
-            var result = (ushort)(A + value + (carry && FlagC ? 1 : 0));
+            var result = (ushort)(A + value);
             FlagC = (result & 0xFF00) != 0;
+            FlagH = (A & 0x0F) + (value & 0x0F) > 0x0F;
             A = (byte) (result & 0xFF);
             FlagZ = A == 0;
-            FlagH = (A & 0x0F) + ((value + (carry ? 1 : 0)) & 0x0F) > 0x0F;
             FlagN = false;
         }
         
-        private void Sub(byte value, bool carry = false)
+        private void Adc(byte value)        // Verified OK - 09
         {
-            byte valueWithCarry = (byte) (value + (carry && FlagC ? 1 : 0));
+            var result = (ushort)(A + value + (FlagC ? 1 : 0));
+            FlagH = (A & 0x0F) + (value & 0x0F) + (FlagC ? 1 : 0) > 0x0F;
+            FlagC = (result & 0xFF00) != 0;
+            A = (byte) (result & 0xFF);
+            FlagZ = A == 0;
+            FlagN = false;
+        }
+        
+        private void Sub(byte value)        // Verified OK - 09
+        {
             FlagN = true;
-            FlagC = valueWithCarry > A;
-            FlagZ = valueWithCarry == A;
-            FlagH = (valueWithCarry & 0x0F) > (A & 0x0F);
-            A -= valueWithCarry;
+            FlagC = value > A;
+            FlagZ = value == A;
+            FlagH = (value & 0x0F) > (A & 0x0F);
+            A -= value;
+        }
+        
+        private void Sbc(byte value)        // Verified OK - 09
+        {
+            int result = A - value - (FlagC ? 1 : 0);
+            FlagH = ((sbyte)A & 0x0F) - (value & 0x0F) - (FlagC ? 1 : 0) < 0;
+            FlagC = result < 0;
+            A = (byte)result;
+            FlagZ = A == 0;
+            FlagN = true;
         }
         
         // 16 bit airthmetic add
@@ -2866,7 +2768,7 @@ namespace ZarthGB
             return (ushort) (result & 0xFFFF);
         }
         
-        private void Compare(byte a)
+        private void Compare(byte a)                // Verified OK - 09
         {
             Compare(A, a);
         }
@@ -2878,12 +2780,12 @@ namespace ZarthGB
         // N - Set.
         // H - Set if no borrow from bit 4.
         // C - Set for no borrow. (Set if A < n.)
-        private void Compare(byte a, byte b)
+        private void Compare(byte a, byte b)        // Verified OK - 09
         {
             FlagN = true;
-            FlagZ = a == b;
-            FlagC = a < b;
-            FlagH = (a & 0x0F) > (b & 0x0F);
+            FlagC = b > a;
+            FlagZ = b == a;
+            FlagH = (b & 0x0F) > (a & 0x0F);
         }
         
         #endregion
@@ -2894,7 +2796,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 7 data.
-        private byte Rlc(byte value)
+        private byte Rlc(byte value)        // Verified OK - 09
         {
             FlagC = (value & 0x80) != 0;
             byte result = (byte) (value << 1);
@@ -2911,7 +2813,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 0 data.
-        private byte Rrc(byte value)
+        private byte Rrc(byte value)        // Verified OK - 09
         {
             FlagC = (value & 0x01) != 0;
             byte result = (byte) (value >> 1);
@@ -2929,7 +2831,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 7 data.
-        private byte Rl(byte value)
+        private byte Rl(byte value)         // Verified OK - 09
         {
             int carry = FlagC ? 1 : 0;
             FlagC = (value & 0x80) != 0;
@@ -2947,7 +2849,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 0 data.
-        private byte Rr(byte value)
+        private byte Rr(byte value)         // Verified OK - 09
         {
             byte result = (byte) (value >> 1);
             if (FlagC)
@@ -2965,7 +2867,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 7 data.
-        private byte Sla(byte value)
+        private byte Sla(byte value)            // Verified OK - 09
         {
             FlagC = (value & 0x80) != 0;
             byte result = (byte) (value << 1);
@@ -2981,7 +2883,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 0 data. 
-        private byte Sra(byte value)
+        private byte Sra(byte value)            // Verified OK - 09
         {
             FlagC = (value & 0x01) != 0;
             var result = (byte) ((value & 0x80) | (value >> 1));
@@ -2997,7 +2899,7 @@ namespace ZarthGB
         // N - Reset.
         // H - Reset.
         // C - Contains old bit 0 data.
-        private byte Srl(byte value)
+        private byte Srl(byte value)            // Verified OK - 09
         {
             FlagC = (value & 0x01) != 0;
             var result = (byte) (value >> 1);
@@ -3012,7 +2914,7 @@ namespace ZarthGB
             return (ushort)(((value & 0x00FF) << 8) | ((value & 0xFF00) >> 8));
         }
 
-        private byte Swap(byte value)
+        private byte Swap(byte value)               // Verified OK - 09
         {
             var result = (byte) (((value & 0x0F) << 4) | ((value & 0xF0) >> 4));
             FlagZ = result == 0;

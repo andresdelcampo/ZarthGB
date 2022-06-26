@@ -26,17 +26,17 @@ namespace ZarthGB
             //emulator.LoadCartridge("tetris.gb");
             //emulator.LoadCartridge("sml.gb");
             //emulator.LoadCartridge("01-special.gb");              // Failed #6 DAA
-            emulator.LoadCartridge("02-interrupts.gb");           // OK!
-            //emulator.LoadCartridge("03-op sp,hl.gb");             // Failed E8 E8 F8 F8
-            //emulator.LoadCartridge("04-op r,imm.gb");             // Failed FE C6 CE DE
+            //emulator.LoadCartridge("02-interrupts.gb");           // OK!
+            //emulator.LoadCartridge("03-op sp,hl.gb");             // OK!
+            //emulator.LoadCartridge("04-op r,imm.gb");             // OK!
             //emulator.LoadCartridge("05-op rp.gb");                // OK!
             //emulator.LoadCartridge("06-ld r,r.gb");               // OK!
             //emulator.LoadCartridge("07-jr,jp,call,ret,rst.gb");   // OK!
             //emulator.LoadCartridge("08-misc instrs.gb");          // OK!
-            //emulator.LoadCartridge("09-op r,r.gb");               // Failed plenty on compare    
+            //emulator.LoadCartridge("09-op r,r.gb");               // OK!    
             //emulator.LoadCartridge("10-bit ops.gb");              // OK!
-            //emulator.LoadCartridge("11-op a,(hl).gb");            // Failed BE 86 8E 9E 27
-            //emulator.LoadCartridge("cpu_instrs.gb");              // Fails 6 tests -wait for keys sometimes
+            //emulator.LoadCartridge("11-op a,(hl).gb");            // OK!
+            emulator.LoadCartridge("cpu_instrs.gb");              // Fails 6 tests -wait for keys sometimes
             
                 
             cts = new CancellationTokenSource();

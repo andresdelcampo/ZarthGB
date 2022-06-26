@@ -101,8 +101,8 @@ namespace ZarthGB
                                 InterruptFlags |= InterruptsVblank;
                             
                             TimeSpan ts = stopwatch.Elapsed;
-                            if (ts < expectedFrameTime)
-                                System.Threading.Thread.Sleep(expectedFrameTime - ts);
+                            //if (ts < expectedFrameTime)
+                                //System.Threading.Thread.Sleep(expectedFrameTime - ts);
                             stopwatch.Restart();
                             frameReady = true;
 
