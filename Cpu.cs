@@ -1,6 +1,13 @@
 ﻿using System;
 using System.Diagnostics;
 
+// References
+// - GitHub Copilot -for a very fast start (500+ instructions in 3-4h), which would prove rather error prone later
+// - https://gbdev.io/gb-opcodes/optables/ for visual reference of the instructions while coding them, or for timing
+// - http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf probably the best GameBoy CPU manual -though not exempt of inaccuracies
+// - https://github.com/retrio/gb-test-roms as source for Blargg test roms for CPU instuctions
+// - https://github.com/TheSorm/Boy (for the toughest instructions to pass the Blargg tests, 2-3 would have been impossible to guess)
+
 namespace ZarthGB
 {
     class Cpu

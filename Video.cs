@@ -2,6 +2,11 @@
 using System.Diagnostics;
 using System.Drawing;
 
+// References
+// - https://github.com/CTurt/Cinoop mostly code from display.c and gpu.c
+// - http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html for window implementation
+// - https://rylev.github.io/DMG-01/public/book/graphics/tile_ram.html on Tiles and encoding
+
 namespace ZarthGB
 {
     class Video

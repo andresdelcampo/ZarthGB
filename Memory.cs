@@ -1,6 +1,12 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Drawing;
+
+// References
+// - https://github.com/CTurt/Cinoop mostly code from memory.c like IO and some registers
+// - http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf probably the best GameBoy CPU/memory manual
+// - https://knight.sc/reverse%20engineering/2018/11/19/game-boy-boot-sequence.html on Boot sequence
+// - https://gist.github.com/drhelius/6063288 on Boot sequence
+// - https://retrocomputing.stackexchange.com/questions/11732/how-does-the-gameboys-memory-bank-switching-work on MBC1 implementation
 
 namespace ZarthGB
 {
@@ -184,13 +190,15 @@ namespace ZarthGB
 		{
 			Mbc1Enabled = romType == Cartridge.RomType.Mbc1;
 			if (!Mbc1Enabled && cart.Length != 32 * 1024)
-				throw new InvalidOperationException("Wrong plain cartridge lenght!");
+				throw new InvalidOperationException("Wrong plain cartridge length!");
 
 			cartridge = new byte[cart.Length];
 			for (int i = 0; i < cart.Length; i++)
 				cartridge[i] = cart[i];
 
 			BankSelected = 1;
+			RamBankSelected = 0;
+			Mbc1ModeRam = false;
 		}
 		
 		public byte this[int address]
@@ -236,6 +244,7 @@ namespace ZarthGB
 			        if (address <= 0x1FFF)
 			        {
 				        RamEnabled = ((value & 0x0F) == 0x0A);
+				        RamBankSelected = 0;
 				        return;
 			        }
 			        if (address <= 0x3FFF)
@@ -257,7 +266,7 @@ namespace ZarthGB
 			        }
 			        if (address <= 0x7FFF)
 			        {
-				        Mbc1ModeRam = value != 0;
+				        Mbc1ModeRam = value == 1;
 				        return;
 			        }
 			        if (Mbc1ModeRam && address >= 0xA000 && address <= 0xBFFFF)

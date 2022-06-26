@@ -24,8 +24,8 @@ namespace ZarthGB
         {
             //emulator.LoadCartridge("bgbtest.gb");
             //emulator.LoadCartridge("tetris.gb");
-            //emulator.LoadCartridge("sml.gb");
-            //emulator.LoadCartridge("01-special.gb");              // Failed #6 DAA
+            emulator.LoadCartridge("sml.gb");
+            //emulator.LoadCartridge("01-special.gb");              // OK!
             //emulator.LoadCartridge("02-interrupts.gb");           // OK!
             //emulator.LoadCartridge("03-op sp,hl.gb");             // OK!
             //emulator.LoadCartridge("04-op r,imm.gb");             // OK!
@@ -36,7 +36,7 @@ namespace ZarthGB
             //emulator.LoadCartridge("09-op r,r.gb");               // OK!    
             //emulator.LoadCartridge("10-bit ops.gb");              // OK!
             //emulator.LoadCartridge("11-op a,(hl).gb");            // OK!
-            emulator.LoadCartridge("cpu_instrs.gb");              // Fails 6 tests -wait for keys sometimes
+            //emulator.LoadCartridge("cpu_instrs.gb");              // OK! -waits for keys sometimes?
             
                 
             cts = new CancellationTokenSource();
