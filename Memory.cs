@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.DirectoryServices.ActiveDirectory;
+using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ZarthGB
 {
@@ -13,8 +9,9 @@ namespace ZarthGB
         private byte[] memory;
         private byte[] cartridge;
         public int Ticks { get; set; }
-
-        //private Random random;
+        public Stopwatch Timer { get; private set; } = new Stopwatch();
+        public long TimerTick { get; private set; }
+        public Stopwatch Timer2 { get; private set; } = new Stopwatch();
         
         #region Keyboard
         public bool KeyUp { get; set; }
@@ -141,7 +138,7 @@ namespace ZarthGB
 		{
 			Tiles = new byte[384,8,8];
 			Ticks = 0;
-			
+
 			memory = new byte[0x10000];
 
 			for (int i = 0; i < dmgBoot.Length; i++)
@@ -201,6 +198,7 @@ namespace ZarthGB
         {
 	        get
 	        {
+		        // If requesting low bytes and boot rom is not disabled (inverted bool)
 		        if (address <= 0x00FF && memory[0xFF50] == 0x00)
 			        return dmgBoot[address];
 
@@ -218,7 +216,7 @@ namespace ZarthGB
 			        if (address <= 0x7FFF)
 				        return cartridge[address];
 		        
-		        if(address == 0xff00) 
+		        if (address == 0xff00) 
 		        {
 			        byte io = memory[address];
 			        if((io & 0x20) == 0) 
@@ -229,10 +227,6 @@ namespace ZarthGB
 						return 0xff;
 			        return 0;
 		        }
-
-		        // DIV register is incremented 16384 times a second. 
-		        // Should return a div timer, but a random number works just as well for Tetris
-		        //if(address == 0xff04) return (byte)random.Next(256);
 		        
 			    return memory[address]; 
 	        }
@@ -289,6 +283,28 @@ namespace ZarthGB
 		        // DIV (timer) reset -writing to it resets it to 0
 		        else if (address == 0xff04)
 			        memory[address] = 0;
+		        
+		        // Configurable Timer
+		        else if (address == 0xff07)
+		        {
+			        long timerFrequency = 4096;
+			        switch (value & 0x03)
+			        {
+				        case 0: timerFrequency = 4096; break;	// 4096
+				        case 1: timerFrequency = 262144; break;	// 262144
+				        case 2: timerFrequency = 65536; break;	// 65536
+				        case 3: timerFrequency = 16384; break;	// 16384
+			        }
+			        //TimerTick = Stopwatch.Frequency / timerFrequency;
+
+			        if ((value & 0x04) > 0)
+			        {
+				        Timer.Start();
+						Timer2.Start(); // Remove				        
+			        }
+			        else
+				        Timer.Stop();
+		        }
 
 		        // OAM DMA
 		        else if (address == 0xff46)

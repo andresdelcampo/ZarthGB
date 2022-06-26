@@ -7,6 +7,7 @@ namespace ZarthGB
     {
         private Memory memory;
         public bool Stopped { get; private set; }
+        public bool Halted { get; private set; }
         
         private ushort[] pcTrace = new ushort[6553600];
         private int pcTracePtr = 0;
@@ -104,7 +105,11 @@ namespace ZarthGB
         }
         private Stopwatch divStopwatch = new Stopwatch();
         private long divTick = Stopwatch.Frequency / 16384;
-
+        
+        private long lastTimerTicks = 0;
+        private long allTimerCounters = 0;
+        private long timesTriggered = 0;
+        
         private int[] normalInstructionHalfTicks = {
             2, 6, 4, 4, 2, 2, 4, 4, 10, 4, 4, 4, 2, 2, 4, 2, // 0x0_
             2, 6, 4, 4, 2, 2, 4, 4,  6, 4, 4, 4, 2, 2, 4, 2, // 0x1_
@@ -171,33 +176,38 @@ namespace ZarthGB
             {
                 byte fire = (byte) (InterruptEnable & InterruptFlags);
 
-                if ((fire & InterruptsVblank) == 1)
+                if ((fire & InterruptsVblank) != 0)
                 {
                     InterruptFlags = (byte) (InterruptFlags & ~InterruptsVblank);
+                    Halted = false;
                     Vblank();
                 }
 
-                if ((fire & InterruptsLcdstat) == 1)
+                if ((fire & InterruptsLcdstat) != 0)
                 {
                     InterruptFlags = (byte) (InterruptFlags & ~InterruptsLcdstat);
+                    Halted = false;
                     LcdStat();
                 }
 
-                if ((fire & InterruptsTimer) == 1)
+                if ((fire & InterruptsTimer) != 0)
                 {
                     InterruptFlags = (byte) (InterruptFlags & ~InterruptsTimer);
+                    Halted = false;
                     Timer();
                 }
 
-                if ((fire & InterruptsSerial) == 1)
+                if ((fire & InterruptsSerial) != 0)
                 {
                     InterruptFlags = (byte) (InterruptFlags & ~InterruptsSerial);
+                    Halted = false;
                     Serial();
                 }
 
-                if ((fire & InterruptsJoypad) == 1)
+                if ((fire & InterruptsJoypad) != 0)
                 {
                     InterruptFlags = (byte) (InterruptFlags & ~InterruptsJoypad);
+                    Halted = false;
                     Joypad();
                 }
             }
@@ -274,6 +284,7 @@ namespace ZarthGB
             //memory[0xFF50] = 0x01;	// Disable Boot ROM
             
             Stopped = false;
+            Halted = false;
             Steps = 0;
         }
 
@@ -293,7 +304,43 @@ namespace ZarthGB
                 memory.IncrementDiv();
             }
 
-            if (Stopped) return;
+            // Configurable Timer
+            if (memory.Timer.IsRunning && (memory.Timer.ElapsedTicks - lastTimerTicks) > memory.TimerTick)
+            {
+                double currentTicks = memory.Timer.ElapsedTicks;
+                
+                // Faster but still heavy, only triggers interrupts about 600 times a second (should be 1000)
+                int timesToAdd = 0;
+                do
+                {
+                    timesToAdd++;
+                    lastTimerTicks += memory.TimerTick;
+                } while (currentTicks - lastTimerTicks > memory.TimerTick);
+
+                // Very precise, but too heavy, only triggers interrupts about 200 times a second
+                //long timesToAdd = (long)Math.Floor((currentTicks - lastTimerTicks) / memory.TimerTick);
+                allTimerCounters += timesToAdd;
+                //Debug.Print($"timesToAdd {timesToAdd.ToString()}");
+                //lastTimerTicks = (long) (allTimerCounters * memory.TimerTick);
+
+                int newCounterValue = memory[0xff05] + timesToAdd;
+                memory[0xff05] = (byte) (newCounterValue & 0xFF);
+                if (newCounterValue > 0xFF)
+                {
+                    //Debug.Print($"allTimerCounters {allTimerCounters.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}, Ticks {memory.Timer2.ElapsedTicks}, freq {(Stopwatch.Frequency*allTimerCounters)/memory.Timer2.ElapsedTicks}");
+                    memory[0xff05] = memory[0xff06];
+                    if ((InterruptEnable & InterruptsTimer) > 0)
+                    {
+                        timesTriggered++;
+                        InterruptMasterEnable = true;
+                        InterruptFlags |= InterruptsTimer;
+                        //if (timesTriggered % 16 == 0)
+                            //Debug.Print($"timesTriggered {timesTriggered.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}");
+                    }
+                }
+            }
+            
+            if (Stopped || Halted) return;
 
             #region Tracing
             pcTrace[pcTracePtr++] = PC;
@@ -324,8 +371,8 @@ namespace ZarthGB
             if (PC == 0x100)
                 PC = PC;
 
-            //if (PC == 0x166)
-                //PC = PC;
+            if (PC == 0xC32F)
+                PC = PC;
             #endregion
                 
             Steps++;
@@ -978,10 +1025,8 @@ namespace ZarthGB
                     break;
                     
                 case 0x76: // HALT
-                    if(InterruptMasterEnable) {
-                        //HALT EXECUTION UNTIL AN INTERRUPT OCCURS
-                    }
-                    else PC++;
+                    // Halt execution until interrupt occurs
+                    Halted = true;
                     break;
                     
                 case 0x77: // LD (HL), A

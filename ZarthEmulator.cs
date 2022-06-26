@@ -9,7 +9,6 @@ namespace ZarthGB
     {
         Emulator emulator = new Emulator();
         CancellationTokenSource cts;
-        bool enableRender = true;
 
         Brush WhiteBrush = new SolidBrush(Color.White);
         Brush LightGrayBrush = new SolidBrush(Color.LightGray);
@@ -23,7 +22,6 @@ namespace ZarthGB
 
         private void ZarthEmulator_Load(object sender, EventArgs e)
         {
-            //enableRender = false;
             //emulator.LoadCartridge("bgbtest.gb");
             //emulator.LoadCartridge("tetris.gb");
             //emulator.LoadCartridge("sml.gb");
@@ -60,7 +58,7 @@ namespace ZarthGB
 
         private void timer_Tick(object sender, EventArgs e)
         {
-            if (enableRender && emulator.IsFrameReady)
+            if (emulator.IsFrameReady)
                 Render();
         }
 
