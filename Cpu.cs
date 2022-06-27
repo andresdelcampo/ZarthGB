@@ -184,11 +184,11 @@ namespace ZarthGB
 
         #region Interrupts
 
-        private const byte InterruptsVblank = (1 << 0);
-        private const byte InterruptsLcdstat = (1 << 1);
-        private const byte InterruptsTimer = (1 << 2);
-        private const byte InterruptsSerial = (1 << 3);
-        private const byte InterruptsJoypad = (1 << 4);
+        public const byte InterruptsVblank = (1 << 0);
+        public const byte InterruptsLcdstat = (1 << 1);
+        public const byte InterruptsTimer = (1 << 2);
+        public const byte InterruptsSerial = (1 << 3);
+        public const byte InterruptsJoypad = (1 << 4);
 
         private bool InterruptMasterEnable { get; set; }
         private byte InterruptEnable
@@ -340,6 +340,8 @@ namespace ZarthGB
         public void KeyPressed()
         {
             Stopped = false;
+            if((InterruptEnable & InterruptsJoypad) > 0) 
+                InterruptFlags |= InterruptsJoypad;
         }
         
         public void Step()

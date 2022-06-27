@@ -269,7 +269,7 @@ namespace ZarthGB
 				        Mbc1ModeRam = value == 1;
 				        return;
 			        }
-			        if (Mbc1ModeRam && address >= 0xA000 && address <= 0xBFFFF)
+			        if (Mbc1ModeRam && address >= 0xA000 && address <= 0xBFFF)
 			        {
 				        Ram[(RamBankSelected * 16 * 1024) + (address - 0xA000)] = value;
 				        return;
@@ -340,7 +340,7 @@ namespace ZarthGB
 		{
 			address &= 0xfffe;
 	
-			ushort tile = (ushort) ((address >> 4) & 511);
+			ushort tile = (ushort) ((address >> 4) & 0x1FF);
 			ushort y = (ushort) ((address >> 1) & 7);
 	
 			byte x, bitIndex;

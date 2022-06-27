@@ -3,9 +3,10 @@ using System.Diagnostics;
 using System.Drawing;
 
 // References
-// - https://github.com/CTurt/Cinoop mostly code from display.c and gpu.c
-// - http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html for window implementation
+// - https://github.com/CTurt/Cinoop mostly code from gpu.c and display.c -the second one heavily altered using below 
+// - http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html for window and tiles implementation
 // - https://rylev.github.io/DMG-01/public/book/graphics/tile_ram.html on Tiles and encoding
+// - https://www.youtube.com/watch?v=zQE1K074v3s How Graphics worked on the Nintendo Game Boy | MVG -for LYC register and interrupt!!
 
 namespace ZarthGB
 {
@@ -32,7 +33,6 @@ namespace ZarthGB
             }
         }
 
-        private const byte InterruptsVblank = (1 << 0);
         private byte InterruptEnable
         {
             get => memory[0xffff];
@@ -45,13 +45,16 @@ namespace ZarthGB
         } 
         
         private byte Control => memory[0xFF40];
-        private byte ScrollX => memory[0xFF43];
         private byte ScrollY => memory[0xFF42];
+        private byte ScrollX => memory[0xFF43];
+        private byte WindowY => memory[0xFF4A];
+        private byte WindowX => (byte)(memory[0xFF4B] - 7);
         private byte Scanline
         {
             get { return memory[0xFF44]; }
             set { memory[0xFF44] = value; }
         }
+        private byte ScanlineInterrupt => memory[0xFF45];
         
         private int GpuTick;
         private byte[] scanlineRow = new byte[160];
@@ -71,14 +74,14 @@ namespace ZarthGB
         private int Ticks => memory.Ticks;
         int LastTicks = 0;
 
-        //private byte BGEnable => (1 << 0);
-        //private byte SpriteEnable => (1 << 1);
-        //private byte SpriteDouble => (1 << 2);
+        private byte BGEnable => (1 << 0);
+        private byte SpriteEnable => (1 << 1);
+        private byte SpriteDouble => (1 << 2);
         private byte TileMap => (1 << 3);
-        //private byte TileSet => (1 << 4);
-        //private byte WindowEnable => (1 << 5);
-        //private byte WindowTileMap => (1 << 6);
-        //private byte DisplayEnable => (1 << 7);
+        private byte TileSet => (1 << 4);
+        private byte WindowEnable => (1 << 5);
+        private byte WindowTileMap => (1 << 6);
+        private byte DisplayEnable => (1 << 7);
 
         
         public Video(Memory memory, Color[] framebuffer)
@@ -102,12 +105,12 @@ namespace ZarthGB
                         Scanline++;     // HBlank
                         if(Scanline == 143) 
                         {
-                            if((InterruptEnable & InterruptsVblank) > 0) 
-                                InterruptFlags |= InterruptsVblank;
+                            if((InterruptEnable & Cpu.InterruptsVblank) > 0) 
+                                InterruptFlags |= Cpu.InterruptsVblank;
                             
                             TimeSpan ts = stopwatch.Elapsed;
-                            //if (ts < expectedFrameTime)
-                                //System.Threading.Thread.Sleep(expectedFrameTime - ts);
+                            if (ts < expectedFrameTime)
+                                System.Threading.Thread.Sleep(expectedFrameTime - ts);
                             stopwatch.Restart();
                             frameReady = true;
 
@@ -147,6 +150,8 @@ namespace ZarthGB
                     if(GpuTick >= 172) 
                     {
                         GpuMode = GpuModeEnum.HBlank;
+                        if((InterruptEnable & Cpu.InterruptsLcdstat) > 0 && Scanline == ScanlineInterrupt) 
+                            InterruptFlags |= Cpu.InterruptsLcdstat;
                         RenderScanline();
                         GpuTick -= 172;
                     }
@@ -154,76 +159,108 @@ namespace ZarthGB
                     break;
             }
         }
-        
-        private void RenderScanline() 
+
+        private void RenderScanline()
         {
-            int mapOffset = ((Control & TileMap) != 0) ? 0x1c00 : 0x1800;
-            
-            // which of the 8 vertical pixels of the current tile is the scanline on? add offset
-            mapOffset += (((Scanline + ScrollY) & 255) >> 3) << 5;
+            if ((Control & DisplayEnable) == 0) return;
 
-            int lineOffset = (ScrollX >> 3);
-	
-            int x = ScrollX & 7;
-            int y = (Scanline + ScrollY) & 7;
-	
-            int pixelOffset = Scanline * 160;
-	
-            ushort tile = memory[VideoRamBegin + mapOffset + lineOffset];
-            //if((gpu.control & GPU_CONTROL_TILESET) && tile < 128) tile += 256;
-	
-            // if bg enabled
-            for(int i = 0; i < 160; i++) 
+            if ((Control & BGEnable) != 0)
+                RenderTiles();
+
+            if ((Control & SpriteEnable) != 0)
+                RenderSprites();
+        }
+
+        private void RenderTiles()
+        {
+            bool usingWindow = false;
+
+            if ((Control & WindowEnable) != 0)
             {
-                byte colour = memory.Tiles[tile,y,x];
-                scanlineRow[i] = colour;
-                framebuffer[pixelOffset++] = memory.BackgroundPalette[colour];
-                x++;
-
-                if(x == 8) 
-                {
-                    x = 0;
-                    lineOffset = (lineOffset + 1) & 31;
-                    tile = memory[VideoRamBegin + mapOffset + lineOffset];
-                    //if((gpu.control & GPU_CONTROL_TILESET) && tile < 128) tile += 256;
-                }
+                // is the current scanline we're drawing within the windows Y pos?
+                if (WindowY <= Scanline)
+                    usingWindow = true;
             }
-	
-            // if sprites enabled
-            for(int i = 0; i < 40; i++) 
+            
+            // which tile data are we using?
+            //int tileData = ((Control & TileSet) != 0) ? 0x8000 : 0x8800;
+            
+            // which background mem?
+            int mapOffset;
+            if (usingWindow)
+                mapOffset = ((Control & WindowTileMap) != 0) ? 0x1c00 : 0x1800;
+            else
+                mapOffset = ((Control & TileMap) != 0) ? 0x1c00 : 0x1800;
+
+            // which of 32 vertical tiles the current scanline is drawing
+            // which of the 8 vertical pixels of the current tile is the scanline on? add offset
+            byte yPos;
+            if (usingWindow)
+                yPos = (byte)(Scanline - WindowY);
+            else
+                yPos = (byte)(Scanline + ScrollY);
+
+            ushort tileRow = (ushort) ((yPos >> 3) << 5);
+            
+            int pixelOffset = Scanline * 160;
+            
+            for(int pixel = 0; pixel < 160; pixel++) 
+            {
+                byte xPos = (byte) (pixel + ScrollX);
+                
+                if (usingWindow)
+                    if (pixel >= WindowX)
+                        xPos = (byte) (pixel - WindowX); 
+                
+                ushort tileCol = (byte) (xPos >> 3);
+
+                ushort tile = memory[VideoRamBegin + mapOffset + tileRow + tileCol];
+                if((Control & TileSet) == 0 && tile < 128) tile += 256;
+
+                byte colour = memory.Tiles[tile, yPos % 8, xPos % 8];
+                scanlineRow[pixel] = colour;
+                framebuffer[pixelOffset++] = memory.BackgroundPalette[colour];
+            }
+        }            
+        
+        private void RenderSprites()
+        {
+            bool spriteDouble = ((Control & WindowEnable) != 0);
+                
+            for (int i = 0; i < 40; i++)
             {
                 // Point sprite to the memory location of the sprite -each size 4 bytes
-                sprite.MemoryOffset = OamBegin + i*4;
-		
+                sprite.MemoryOffset = OamBegin + i * 4;
+
                 // 8 and 16 are the top left corner for sprites
                 int sx = sprite.X - 8;
                 int sy = sprite.Y - 16;
-		
-                if(sy <= Scanline && (sy + 8) > Scanline) 
+
+                if (sy <= Scanline && (sy + (spriteDouble? 16 : 8)) > Scanline)
                 {
-                    pixelOffset = Scanline * 160 + sx;
-			
+                    int pixelOffset = Scanline * 160 + sx;
+
                     byte tileRow;
-                    if(sprite.VFlip) 
-                        tileRow = (byte) (7 - (Scanline - sy));
-                    else 
-                        tileRow = (byte) (Scanline - sy);
-			
-                    for(x = 0; x < 8; x++) 
+                    if (sprite.VFlip)
+                        tileRow = (byte)((spriteDouble? 15 : 7) - (Scanline - sy));
+                    else
+                        tileRow = (byte)(Scanline - sy);
+
+                    for (int x = 0; x < 8; x++)
                     {
-                        if(sx + x >= 0 && 
-                           sx + x < 160 && 
-                           (!sprite.Priority || scanlineRow[sx + x] == 0)) 
+                        if (sx + x >= -8 &&
+                            sx + x < 160 &&
+                            (!sprite.Priority || scanlineRow[sx + x] == 0))
                         {
                             byte colour;
-					
-                            if(sprite.HFlip) 
+
+                            if (sprite.HFlip)
                                 colour = memory.Tiles[sprite.TileNumber, tileRow, 7 - x];
-                            else 
+                            else
                                 colour = memory.Tiles[sprite.TileNumber, tileRow, x];
-					
-                            if(colour > 0 && pixelOffset >= 0) 
-                                framebuffer[pixelOffset] = memory.SpritePalette[sprite.Palette ? 1:0, colour];
+
+                            if (colour > 0 && pixelOffset >= 0)
+                                framebuffer[pixelOffset] = memory.SpritePalette[sprite.Palette ? 1 : 0, colour];
 
                             pixelOffset++;
                         }
