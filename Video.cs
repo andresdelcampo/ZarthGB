@@ -225,14 +225,14 @@ namespace ZarthGB
         
         private void RenderSprites()
         {
-            bool spriteDouble = ((Control & WindowEnable) != 0);
+            bool spriteDouble = ((Control & SpriteDouble) != 0);
                 
             for (int i = 0; i < 40; i++)
             {
                 // Point sprite to the memory location of the sprite -each size 4 bytes
                 sprite.MemoryOffset = OamBegin + i * 4;
 
-                // 8 and 16 are the top left corner for sprites
+                // 8 and 16 are the top left corner so that sprites can be drawn coming out from outside the screen
                 int sx = sprite.X - 8;
                 int sy = sprite.Y - 16;
 
@@ -248,7 +248,7 @@ namespace ZarthGB
 
                     for (int x = 0; x < 8; x++)
                     {
-                        if (sx + x >= -8 &&
+                        if (sx + x >= 0 &&
                             sx + x < 160 &&
                             (!sprite.Priority || scanlineRow[sx + x] == 0))
                         {
@@ -259,11 +259,11 @@ namespace ZarthGB
                             else
                                 colour = memory.Tiles[sprite.TileNumber, tileRow, x];
 
-                            if (colour > 0 && pixelOffset >= 0)
+                            if (colour > 0)
                                 framebuffer[pixelOffset] = memory.SpritePalette[sprite.Palette ? 1 : 0, colour];
-
-                            pixelOffset++;
                         }
+                        
+                        pixelOffset++;
                     }
                 }
             }
