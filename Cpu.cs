@@ -105,6 +105,7 @@ namespace ZarthGB
         #region Cycles
 
         public int Steps { get; private set; }
+        //private int TransferInProgressTicks = 0;    
         public int Ticks 
         {
             get => memory.Ticks;
@@ -133,6 +134,25 @@ namespace ZarthGB
                             }
                         }
                     }
+
+                    // Process serial port if needed
+                    /*if (TransferInProgressTicks > 0)    // Transfer in progress
+                    {
+                        TransferInProgressTicks--;
+                        if (TransferInProgressTicks == 0)
+                        {
+                            memory[0xff01] = 0xFF; // No other GameBoy present
+                            if ((memory[0xffff] & Cpu.InterruptsSerial) > 0)
+                                memory[0xff0f] |= Cpu.InterruptsSerial;
+                        }
+                    }
+                    if (memory[0xff02] >> 7 > 0)    // New transfer
+                    {
+                        // Mark transfer finished -we don't have serial transfers here
+                        memory[0xff02] = (byte)(memory[0xff02] & 0x7F);
+                        TransferInProgressTicks = 8;
+                    }*/
+
                 }
                 
                 memory.Ticks = value;   

@@ -23,8 +23,8 @@ namespace ZarthGB
         private void ZarthEmulator_Load(object sender, EventArgs e)
         {
             //emulator.LoadCartridge("bgbtest.gb");
-            //emulator.LoadCartridge("tetris.gb");
-            emulator.LoadCartridge("sml.gb");
+            emulator.LoadCartridge("tetris.gb");
+            //emulator.LoadCartridge("sml.gb");
             //emulator.LoadCartridge("01-special.gb");              // OK!
             //emulator.LoadCartridge("02-interrupts.gb");           // OK!
             //emulator.LoadCartridge("03-op sp,hl.gb");             // OK!

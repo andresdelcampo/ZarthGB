@@ -12,6 +12,7 @@ namespace ZarthGB
 {
     class Memory
     {
+	    private Sound sound;
         private byte[] memory;
         private byte[] cartridge;
         public int Ticks { get; set; }
@@ -131,6 +132,7 @@ namespace ZarthGB
 		
 		public Memory()
         {
+	        sound = new Sound(this);
 			Reset();
 		}
         
@@ -288,6 +290,17 @@ namespace ZarthGB
 		        else if (address >= 0xE000 && address < 0xFE00)
 			        memory[address-0x2000] = value; 
 		        
+		        // Serial transfer start (a futile attempt to prevent Tetris 2P hang)
+		        /*else if (address == 0xff02 && (value >> 7) > 0)
+		        {
+			        // Mark transfer finished -we don't have serial transfers here
+			        memory[address-1] = 0xFF;	// No other GameBoy present
+			        memory[address] = (byte)(value & 0x7F);
+			        // but the moment we launch the interruption, the 2P game starts...!
+			        if((memory[0xffff] & Cpu.InterruptsSerial) > 0) 
+				        memory[0xff0f] |= Cpu.InterruptsSerial;
+		        }*/
+		        
 		        // DIV (timer) reset -writing to it resets it to 0
 		        else if (address == 0xff04)
 			        memory[address] = 0;
@@ -309,6 +322,12 @@ namespace ZarthGB
 			        else
 				        TimerEnabled = false;
 		        }
+		        
+		        // Sound
+		        else if (address == 0xff14)
+			        sound.StartSound1();
+		        else if (address == 0xff19)
+			        sound.StartSound2();
 
 		        // OAM DMA
 		        else if (address == 0xff46)

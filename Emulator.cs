@@ -9,6 +9,8 @@ namespace ZarthGB
         private Cpu cpu;
         private Video video;
 
+        #region Buttons
+
         public bool KeyUp
         {
             set { memory.KeyUp = value; cpu.KeyPressed(); }
@@ -41,6 +43,8 @@ namespace ZarthGB
         {
             set { memory.KeySelect = value; cpu.KeyPressed(); }
         }
+
+        #endregion
         
         public Color[] Framebuffer { get; } = new Color[160 * 144];
 
@@ -48,6 +52,8 @@ namespace ZarthGB
         
         public Emulator()
         {
+            cartridge = new Cartridge();
+            memory = new Memory();
             cpu = new Cpu(memory);
             video = new Video(memory, Framebuffer);
         }
@@ -60,7 +66,6 @@ namespace ZarthGB
 
         public void RunStep()
         {
-            //while (!cpu.Halted && !cpu.Stopped)
             cpu.Step();
             video.Step();
         }
