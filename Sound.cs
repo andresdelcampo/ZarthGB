@@ -41,6 +41,7 @@ namespace ZarthGB
         private int WaveDuty1 => WaveLength1 >> 6;
         private int Length1 => (64 - (WaveLength1 & 0x3F)) * 4;
         private byte Envelope1 => memory[0xff12];
+        private double Volume1 => (Envelope1 >> 4) / 15.0;
         private byte FrequencyLow1 => memory[0xff13];
         private byte FrequencyHigh1 => (byte)(memory[0xff14] & 7);
         private bool TriggerSound1 => (memory[0xff14] >> 7) != 0;
@@ -53,15 +54,15 @@ namespace ZarthGB
             {
                 double frequency = Hz(Frequency1);
                 int duration = Length1;
-                double gain = WaveDutyToGain(WaveDuty1);
+                double waveDuty = WaveDutyToGain(WaveDuty1);
                 double sweepTime = SweepTimeInSeconds();
             
                 ISampleProvider waveSound1;
                 if (sweepTime == 0)
                 {
                     // No sweep
-                    waveSound1 = new SignalGenerator() { 
-                            Gain = gain, 
+                    waveSound1 = new GBSignalGenerator() { 
+                            Gain = Volume1, 
                             Frequency = frequency,
                             Type = SignalGeneratorType.Square}
                         .Take(TimeSpan.FromMilliseconds(duration));
@@ -72,8 +73,8 @@ namespace ZarthGB
                     double frequencyStart = frequency;
                     double frequencyEnd = FrequencyEnd();
 
-                    waveSound1 = new SignalGenerator() { 
-                            Gain = gain, 
+                    waveSound1 = new GBSignalGenerator() { 
+                            Gain = Volume1, 
                             Frequency = frequencyStart,
                             FrequencyEnd = frequencyEnd,
                             Type = SignalGeneratorType.Sweep,
@@ -159,6 +160,7 @@ namespace ZarthGB
         private int WaveDuty2 => WaveLength2 >> 6;
         private int Length2 => (64 - (WaveLength2 & 0x3F)) * 4;
         private byte Envelope2 => memory[0xff17];
+        private double Volume2 => (Envelope2 >> 4) / 15.0;
         private byte FrequencyLow2 => memory[0xff18];
         private byte FrequencyHigh2 => (byte)(memory[0xff19] & 7);
         private bool TriggerSound2 => (memory[0xff19] >> 7) != 0;
@@ -171,15 +173,15 @@ namespace ZarthGB
             {
                 double frequency = Hz(Frequency2);
                 int duration = Length2;
-                double gain = WaveDutyToGain(WaveDuty2);
                 
-                var waveSound2 = new SignalGenerator() { 
-                        Gain = gain, 
-                        Frequency = frequency,
+                var waveSound2 = new GBSignalGenerator() { 
+                        Gain = Volume2, 
+                        Frequency = frequency,//Frequency2, 
+                        WaveDuty = WaveDuty2,
                         Type = SignalGeneratorType.Square}
                     .Take(TimeSpan.FromMilliseconds(duration));
                 
-                Debug.Print($"QUEUE Freq {frequency}, Duration {duration}, WaveDuty {gain}, Loop {Loop2}");
+                Debug.Print($"QUEUE Freq {Frequency2}, Duration {duration}, Wave {WaveDuty2}, Vol {Volume2}, Loop {Loop2}");
                 
                 queueSound2.Enqueue(new QueuedSound(waveSound2, Loop2));
             }
