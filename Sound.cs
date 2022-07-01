@@ -15,9 +15,12 @@ namespace ZarthGB
     class Sound
     {
         private Memory memory;
-        private CancellationTokenSource cts = new CancellationTokenSource();
         private int SampleRate = 192000;    // Minimum 192kHz to get enough frequency resolution -else sounds distorted
         private int NumChannels = 1;
+        private WaveOutEvent waveOut1 = new WaveOutEvent();
+        private WaveOutEvent waveOut2 = new WaveOutEvent();
+        private BufferedWaveProvider waveBuffer1;
+        private BufferedWaveProvider waveBuffer2;
         
         private byte ChannelControl => memory[0xff24];
         private int RightVolume => (ChannelControl >> 4) & 7;
@@ -36,14 +39,13 @@ namespace ZarthGB
         private bool Sound2On => (OnOff & 1 << 1) != 0;
         
         #region Sound1
-        private Queue<QueuedSound> queueSound1 = new Queue<QueuedSound>();
         private byte Sweep1 => memory[0xff10];
         private int SweepShift => Sweep1 & 0x7; 
         private bool SweepAmplify => (Sweep1 & 0x8) == 0;
         private int SweepPeriod => (Sweep1 >> 4) & 0x7;
         private byte WaveLength1 => memory[0xff11];
         private int WaveDuty1 => WaveLength1 >> 6;
-        private int Length1 => (64 - (WaveLength1 & 0x3F)) * 4;
+        private int Length1 => (64 - (WaveLength1 & 0x3F)) * 3; // Should be 4 but sounds better/faster this way
         private byte Envelope1 => memory[0xff12];
         private double Volume1 => (Envelope1 >> 4) / 15.0;
         private bool EnvelopeAmplify1 => (Envelope1 & 0x8) != 0;
@@ -89,49 +91,12 @@ namespace ZarthGB
                     Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
                 }
                 
-                queueSound1.Enqueue(new QueuedSound(waveSound, Loop1));
+                var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond / 4];
+                var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                waveBuffer1.AddSamples(buffer, 0, bytes);
+                
+                SetSound1On();
             }
-        }
-        
-        private void PlaySound1(object cancellationToken)
-        {
-            var token = (CancellationToken)cancellationToken;
-
-            using (var wo = new WaveOutEvent())
-            {
-                var waveBuffer = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
-                wo.Init(waveBuffer);
-
-                do
-                {
-                    QueuedSound queuedSound;
-                    bool gotIt = queueSound1.TryDequeue(out queuedSound);
-                    while (!gotIt)
-                    {
-                        Thread.Sleep(5);
-                        gotIt = queueSound1.TryDequeue(out queuedSound);
-                    }
-
-                    bool loop = false;// queuedSound.Loop;
-                    
-                    var buffer = new byte[queuedSound.Wave.WaveFormat.AverageBytesPerSecond / 4];
-                    var bytes = queuedSound.Wave.ToWaveProvider().Read(buffer, 0, buffer.Length);
-                    waveBuffer.AddSamples(buffer, 0, bytes);
-
-                    SetSound1On();
-                    
-                    do
-                    {
-                        if (wo.PlaybackState != PlaybackState.Playing)
-                            wo.Play();
-                        Thread.Sleep(5);
-                    } while (loop && !token.IsCancellationRequested); // && queueSound1.IsEmpty);
-
-                    SetSound1Off();
-                    
-                } while (!token.IsCancellationRequested);
-            } 
-
         }
 
         private void SetSound1On()
@@ -147,10 +112,9 @@ namespace ZarthGB
         #endregion
         
         #region Sound2
-        private Queue<QueuedSound> queueSound2 = new Queue<QueuedSound>();
         private byte WaveLength2 => memory[0xff16];
         private int WaveDuty2 => WaveLength2 >> 6;
-        private int Length2 => (64 - (WaveLength2 & 0x3F)) * 4;
+        private int Length2 => (64 - (WaveLength2 & 0x3F)) * 3;     // Should be 4 but sounds better/faster this way
         private byte Envelope2 => memory[0xff17];
         private double Volume2 => (Envelope2 >> 4) / 15.0;
         private bool EnvelopeAmplify2 => (Envelope2 & 0x8) != 0;
@@ -176,48 +140,12 @@ namespace ZarthGB
                 
                 Debug.Print($"QUEUE Freq {Frequency2}, Duration {Length2}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
                 
-                queueSound2.Enqueue(new QueuedSound(waveSound, Loop2));
+                var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond / 4];
+                var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                waveBuffer2.AddSamples(buffer, 0, bytes);
+                
+                SetSound2On();
             }
-        }
-
-        private void PlaySound2(object cancellationToken)
-        {
-            var token = (CancellationToken)cancellationToken;
-            
-            using (var wo = new WaveOutEvent())
-            {
-                var waveBuffer = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
-                wo.Init(waveBuffer);
-
-                do
-                {
-                    QueuedSound queuedSound;
-                    bool gotIt = queueSound2.TryDequeue(out queuedSound);
-                    while (!gotIt)
-                    {
-                        Thread.Sleep(5);
-                        gotIt = queueSound2.TryDequeue(out queuedSound);
-                    }
-                    
-                    bool loop = false;// queuedSound.Loop;
-
-                    var buffer = new byte[queuedSound.Wave.WaveFormat.AverageBytesPerSecond / 4];
-                    var bytes = queuedSound.Wave.ToWaveProvider().Read(buffer, 0, buffer.Length);
-                    waveBuffer.AddSamples(buffer, 0, bytes);
-                    
-                    SetSound2On();
-
-                    do
-                    {
-                        if (wo.PlaybackState != PlaybackState.Playing)
-                            wo.Play();
-                        Thread.Sleep(5);
-                    } while (loop && !token.IsCancellationRequested); //&& queueSound2.IsEmpty);
-
-                    SetSound2Off();
-                    
-                } while (!token.IsCancellationRequested);
-            } 
         }
 
         private void SetSound2On()
@@ -236,17 +164,32 @@ namespace ZarthGB
         {
             this.memory = memory;
             Reset();
-            ThreadPool.QueueUserWorkItem(PlaySound1, cts.Token);
-            ThreadPool.QueueUserWorkItem(PlaySound2, cts.Token);
+
+            waveBuffer1 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
+            waveBuffer2 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
+            waveOut1.Init(waveBuffer1);
+            waveOut2.Init(waveBuffer2);
         }
 
         public void Reset()
         {
         }
 
-        private static double Hz(double gb)
+        public void Play()
         {
-            return 131072.0 / (2048.0 - gb);
+            if (Sound1On)
+            {
+                if (waveOut1.PlaybackState != PlaybackState.Playing)
+                    waveOut1.Play();
+                SetSound1Off();
+            }
+
+            if (Sound2On)
+            {
+                if (waveOut2.PlaybackState != PlaybackState.Playing)
+                    waveOut2.Play();
+                SetSound2Off();
+            }
         }
     }
 

@@ -139,8 +139,17 @@ namespace ZarthGB
 		public void IncrementDiv()
 		{
 			memory[0xff04]++;
+
+			// 1024 times per second or less to keep sound channels synchronized
+			if (memory[0xff04] % 16 == 0)
+				SoundStep();
 		}
 
+		public void SoundStep()
+		{
+			sound.Play();
+		}
+		
 		public void Reset()
 		{
 			Tiles = new byte[384,8,8];
