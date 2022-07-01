@@ -8,7 +8,6 @@ namespace ZarthGB
     public class GBSignalGenerator : ISampleProvider
     {
         private int nSample;
-        private double phi;
         private string[] WaveDutyTable =
         {
             "00000001",
@@ -24,6 +23,8 @@ namespace ZarthGB
         private int periodTimer;
         private double gain;
         private int envelopePeriod;
+        private int shadowFrequency;
+        private int sweepTimer;
         
         public WaveFormat WaveFormat { get; }
 
@@ -39,7 +40,6 @@ namespace ZarthGB
             }
         }
 
-        public bool[] PhaseReverse { get; }
         public SignalGeneratorType Type { get; set; }
         public bool EnvelopeAmplify { get; set; }
 
@@ -65,18 +65,16 @@ namespace ZarthGB
                 waveDutyPosition = 0;
             }
         }
-        public double FrequencyEnd { get; set; }
         public int WaveDuty { get; set; }
-        public double SweepLengthSecs { get; set; }
+        public int SweepPeriod { get; set; }
+        public bool SweepAmplify { get; set; }
+        public int SweepShift { get; set; }
         
         public GBSignalGenerator(int sampleRate, int channels)
         {
-            phi = 0.0;
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
             Type = SignalGeneratorType.Square;
             Gain = 1.0;
-            PhaseReverse = new bool[1];
-            this.SweepLengthSecs = 2.0;
         }
         
         public int Read(float[] buffer, int offset, int count)
@@ -88,25 +86,15 @@ namespace ZarthGB
                 switch (Type)
                 { 
                     case SignalGeneratorType.Sweep:
-                        /*phi += 2.0 * Math.PI * Math.Exp(FrequencyLog + (double) nSample * (FrequencyEndLog - FrequencyLog) / (SweepLengthSecs * (double) WaveFormat.SampleRate)) / (double) WaveFormat.SampleRate;
-                        num2 = Gain * Math.Sin(phi);
-                        ++nSample;
-                        if ((double) nSample > SweepLengthSecs * (double) WaveFormat.SampleRate)
-                        {
-                            nSample = 0;
-                            phi = 0.0;
-                            break;
-                        }*/
-
                         ApplyWave();
                         ApplyEnvelope();
+                        ApplySweep();
 
                         num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain : -gain;
                         nSample++;
 
                         break;
                     case SignalGeneratorType.Square:
-                        //num2 = (double) nSample * (2.0 * Frequency / (double) WaveFormat.SampleRate) % 2.0 - 1.0 >= 0.0 ? Gain : -Gain;
                         ApplyWave();
                         ApplyEnvelope();
 
@@ -119,7 +107,7 @@ namespace ZarthGB
                 }
                 
                 for (int index2 = 0; index2 < WaveFormat.Channels; ++index2)
-                  buffer[num1++] = !PhaseReverse[index2] ? (float) num2 : (float) -num2;
+                  buffer[num1++] = (float) num2;
             }
             return count;
         }
@@ -155,6 +143,50 @@ namespace ZarthGB
                     }
                 }
             }
+        }
+
+        private void ApplySweep()
+        {
+            if (sweepTimer > 0) 
+                sweepTimer -= 1;
+
+            if (sweepTimer == 0)
+            {
+                if (SweepPeriod > 0)
+                    sweepTimer = SweepPeriod;
+                else
+                    sweepTimer = 8;
+
+                if (SweepShift > 0 && SweepPeriod > 0) 
+                {
+                    int newFrequency = UpdateFrequency();
+
+                    if (newFrequency <= 2047 && SweepShift > 0) 
+                    {
+                        frequency = newFrequency;
+                        shadowFrequency = newFrequency;
+
+                        /* for overflow check */
+                        UpdateFrequency();
+                    }
+                }
+            }
+        }
+        
+        private int UpdateFrequency()
+        {
+            int newFrequency = shadowFrequency >> SweepShift;
+
+            if (SweepAmplify)
+                newFrequency = shadowFrequency + newFrequency;
+            else
+                newFrequency = shadowFrequency - newFrequency;
+            
+            // overflow check
+            if (newFrequency > 2047)
+                currentVolume = 0;  // It should be stop channel completely
+
+            return newFrequency;
         }
     }
 }

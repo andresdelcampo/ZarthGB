@@ -38,9 +38,9 @@ namespace ZarthGB
         #region Sound1
         private Queue<QueuedSound> queueSound1 = new Queue<QueuedSound>();
         private byte Sweep1 => memory[0xff10];
-        private int SweepShifts => Sweep1 & 0x7; 
-        private bool SweepIncrease => (Sweep1 & 0x8) == 0;
-        private int SweepTime => (Sweep1 >> 4) & 0x7;
+        private int SweepShift => Sweep1 & 0x7; 
+        private bool SweepAmplify => (Sweep1 & 0x8) == 0;
+        private int SweepPeriod => (Sweep1 >> 4) & 0x7;
         private byte WaveLength1 => memory[0xff11];
         private int WaveDuty1 => WaveLength1 >> 6;
         private int Length1 => (64 - (WaveLength1 & 0x3F)) * 4;
@@ -58,39 +58,38 @@ namespace ZarthGB
         {
             if (TriggerSound1)
             {
-                int duration = Length1;
-                double sweepTime = SweepTimeInSeconds();
-            
-                ISampleProvider waveSound1;
-                //if (sweepTime == 0)
+                ISampleProvider waveSound;
+                if (SweepPeriod == 0)
                 {
                     // No sweep
-                    waveSound1 = new GBSignalGenerator(SampleRate, NumChannels) { 
+                    waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
                             Gain = Volume1, 
                             Frequency = Frequency1,
                             WaveDuty = WaveDuty1,
                             EnvelopeAmplify = EnvelopeAmplify1,
                             EnvelopePeriod = EnvelopePeriod1,
                         }
-                        .Take(TimeSpan.FromMilliseconds(duration));
+                        .Take(TimeSpan.FromMilliseconds(Length1));
                 }
-                /*else
+                else
                 {
                     // Sweep
-                    double frequencyStart = frequency;
-                    double frequencyEnd = FrequencyEnd();
-
-                    waveSound1 = new SignalGenerator() { 
+                    waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
                             Gain = Volume1, 
-                            Frequency = frequencyStart,
-                            FrequencyEnd = frequencyEnd,
+                            Frequency = Frequency1,
+                            WaveDuty = WaveDuty1,
+                            EnvelopeAmplify = EnvelopeAmplify1,
+                            EnvelopePeriod = EnvelopePeriod1,
+                            SweepPeriod = SweepPeriod,
+                            SweepAmplify = SweepAmplify,
+                            SweepShift = SweepShift,
                             Type = SignalGeneratorType.Sweep,
-                            SweepLengthSecs = sweepTime 
                         }
-                        .Take(TimeSpan.FromMilliseconds(duration));
-                }*/
+                        .Take(TimeSpan.FromMilliseconds(Length1));
+                    Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
+                }
                 
-                queueSound1.Enqueue(new QueuedSound(waveSound1, Loop1));
+                queueSound1.Enqueue(new QueuedSound(waveSound, Loop1));
             }
         }
         
@@ -145,27 +144,6 @@ namespace ZarthGB
             OnOff = (byte) (OnOff & 0xFE);      // 11111110
         }
 
-        private double SweepTimeInSeconds()
-        {
-            if (SweepTime > 7) throw new InvalidOperationException("Invalid SweepTime coding");
-            switch (SweepTime)
-            {
-                case 0: return 0;
-                default: return ((SweepTime * 1000.0) / 128.0);
-            }
-        }
-
-        private double FrequencyEnd()
-        {
-            double frequency = Frequency1;
-            for (int i = 0; i < SweepShifts; i++)
-                if (SweepIncrease)
-                    frequency += frequency / (2 ^ SweepShifts);
-                else
-                    frequency -= frequency / (2 ^ SweepShifts);
-            return Hz(frequency);
-        }
-
         #endregion
         
         #region Sound2
@@ -187,20 +165,18 @@ namespace ZarthGB
         {
             if (TriggerSound2)
             {
-                int duration = Length2;
-                
-                var waveSound2 = new GBSignalGenerator(SampleRate, NumChannels) { 
+                var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
                         Gain = Volume2, 
                         Frequency = Frequency2, 
                         WaveDuty = WaveDuty2,
                         EnvelopeAmplify = EnvelopeAmplify2,
                         EnvelopePeriod = EnvelopePeriod2,
                     }
-                    .Take(TimeSpan.FromMilliseconds(duration));
+                    .Take(TimeSpan.FromMilliseconds(Length2));
                 
-                Debug.Print($"QUEUE Freq {Frequency2}, Duration {duration}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
+                Debug.Print($"QUEUE Freq {Frequency2}, Duration {Length2}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
                 
-                queueSound2.Enqueue(new QueuedSound(waveSound2, Loop2));
+                queueSound2.Enqueue(new QueuedSound(waveSound, Loop2));
             }
         }
 
