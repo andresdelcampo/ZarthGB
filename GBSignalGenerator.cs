@@ -1,12 +1,18 @@
-﻿using System;
-using System.Diagnostics;
-using NAudio.Wave;
+﻿using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
 namespace ZarthGB
 {
     public class GBSignalGenerator : ISampleProvider
     {
+        public enum ChannelType
+        {
+            Sweep,
+            Square,
+            Samples,
+            Noise
+        }
+        
         private int nSample;
         private string[] WaveDutyTable =
         {
@@ -27,6 +33,14 @@ namespace ZarthGB
         private int sweepTimer;
         
         public WaveFormat WaveFormat { get; }
+        public int WaveDuty { get; set; }
+        public int SweepPeriod { get; set; }
+        public bool SweepAmplify { get; set; }
+        public int SweepShift { get; set; }
+        public ChannelType Channel { get; set; }
+        public bool EnvelopeAmplify { get; set; }
+        public int[] Samples = new int[32];
+        public int OutputShift { get; set; }
 
         public double Gain
         {
@@ -34,14 +48,9 @@ namespace ZarthGB
             set
             {
                 gain = value;
-                // Convert range from [-1, 1] to [0 to 15]
-                //currentVolume = (int) (15 * (gain + 1) / 2);
                 currentVolume = (int) (15 * gain);
             }
         }
-
-        public SignalGeneratorType Type { get; set; }
-        public bool EnvelopeAmplify { get; set; }
 
         public int EnvelopePeriod
         {
@@ -59,21 +68,14 @@ namespace ZarthGB
                 frequencyTimerStart = (2048 - (int)Frequency) * 4;
                 double clockCorrection = (double)WaveFormat.SampleRate / (double)(4.19*1024*1024);  // 4.19 MHz 
                 frequencyTimerStart = (int) (frequencyTimerStart * clockCorrection);    
-
-                //Debug.Print($"correction {clockCorrection}, frequencyTimerStart {frequencyTimerStart}");
                 frequencyTimer = 0;
                 waveDutyPosition = 0;
             }
         }
-        public int WaveDuty { get; set; }
-        public int SweepPeriod { get; set; }
-        public bool SweepAmplify { get; set; }
-        public int SweepShift { get; set; }
         
         public GBSignalGenerator(int sampleRate, int channels)
         {
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
-            Type = SignalGeneratorType.Square;
             Gain = 1.0;
         }
         
@@ -83,23 +85,40 @@ namespace ZarthGB
             for (int index1 = 0; index1 < count / WaveFormat.Channels; ++index1)
             {
                 double num2;
-                switch (Type)
+                switch (Channel)
                 { 
-                    case SignalGeneratorType.Sweep:
-                        ApplyWave();
+                    case ChannelType.Sweep:
+                        ApplySquareWave();
                         ApplyEnvelope();
                         ApplySweep();
 
-                        num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain : -gain;
+                        num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 5: -gain * 5;
                         nSample++;
 
                         break;
-                    case SignalGeneratorType.Square:
-                        ApplyWave();
+                    case ChannelType.Square:
+                        ApplySquareWave();
                         ApplyEnvelope();
 
-                        num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain : -gain;
+                        num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 4: -gain * 4;
                         nSample++;
+                        break;
+                    
+                    case ChannelType.Samples:
+                        if (frequencyTimer == 0)
+                        {
+                            waveDutyPosition = (waveDutyPosition + 1) % Samples.Length;
+                            frequencyTimer = frequencyTimerStart;
+                        }
+                        else
+                            frequencyTimer--;
+                        
+                        num2 = (Samples[waveDutyPosition] >> OutputShift) / 15.0;
+                        nSample++;
+                        break;
+                    
+                    case ChannelType.Noise:
+                        num2 = 0.0;
                         break;
                     default:
                         num2 = 0.0;
@@ -112,7 +131,7 @@ namespace ZarthGB
             return count;
         }
 
-        private void ApplyWave()
+        private void ApplySquareWave()
         {
             if (frequencyTimer == 0)
             {

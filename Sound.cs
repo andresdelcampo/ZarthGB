@@ -1,26 +1,20 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 // References:
 // - http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf probably the best GameBoy CPU/memory manual
 // - https://github.com/naudio/NAudio/blob/master/Docs/PlaySineWave.md
+// - https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
 
 namespace ZarthGB
 {
     class Sound
     {
         private Memory memory;
-        private int SampleRate = 192000;    // Minimum 192kHz to get enough frequency resolution -else sounds distorted
-        private int NumChannels = 1;
-        private WaveOutEvent waveOut1 = new WaveOutEvent();
-        private WaveOutEvent waveOut2 = new WaveOutEvent();
-        private BufferedWaveProvider waveBuffer1;
-        private BufferedWaveProvider waveBuffer2;
+        private const int SampleRate = 192000;    // Minimum 192kHz to get enough frequency resolution -else sounds distorted
+        private const int NumChannels = 1;
+        private Stopwatch stopwatch = new Stopwatch();
         
         private byte ChannelControl => memory[0xff24];
         private int RightVolume => (ChannelControl >> 4) & 7;
@@ -37,8 +31,11 @@ namespace ZarthGB
         }
         private bool Sound1On => (OnOff & 1) != 0;
         private bool Sound2On => (OnOff & 1 << 1) != 0;
+        private bool Sound3On => (OnOff & 1 << 2) != 0;
         
         #region Sound1
+        private WaveOutEvent waveOut1 = new WaveOutEvent();
+        private BufferedWaveProvider waveBuffer1;
         private byte Sweep1 => memory[0xff10];
         private int SweepShift => Sweep1 & 0x7; 
         private bool SweepAmplify => (Sweep1 & 0x8) == 0;
@@ -50,10 +47,8 @@ namespace ZarthGB
         private double Volume1 => (Envelope1 >> 4) / 15.0;
         private bool EnvelopeAmplify1 => (Envelope1 & 0x8) != 0;
         private int EnvelopePeriod1 => (Envelope1 & 0x7);
-        private byte FrequencyLow1 => memory[0xff13];
-        private byte FrequencyHigh1 => (byte)(memory[0xff14] & 7);
         private bool TriggerSound1 => (memory[0xff14] >> 7) != 0;
-        private int Frequency1 => (FrequencyHigh1 << 8) | FrequencyLow1;
+        private int Frequency1 => ((memory[0xff14] & 7) << 8) | memory[0xff13];
         private bool Loop1 => (memory[0xff14] & 0x40) == 0;
         
         public void StartSound1()
@@ -65,6 +60,7 @@ namespace ZarthGB
                 {
                     // No sweep
                     waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
+                            Channel = GBSignalGenerator.ChannelType.Square,
                             Gain = Volume1, 
                             Frequency = Frequency1,
                             WaveDuty = WaveDuty1,
@@ -77,6 +73,7 @@ namespace ZarthGB
                 {
                     // Sweep
                     waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
+                            Channel = GBSignalGenerator.ChannelType.Sweep,
                             Gain = Volume1, 
                             Frequency = Frequency1,
                             WaveDuty = WaveDuty1,
@@ -85,7 +82,6 @@ namespace ZarthGB
                             SweepPeriod = SweepPeriod,
                             SweepAmplify = SweepAmplify,
                             SweepShift = SweepShift,
-                            Type = SignalGeneratorType.Sweep,
                         }
                         .Take(TimeSpan.FromMilliseconds(Length1));
                     Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
@@ -110,8 +106,10 @@ namespace ZarthGB
         }
 
         #endregion
-        
+
         #region Sound2
+        private WaveOutEvent waveOut2 = new WaveOutEvent();
+        private BufferedWaveProvider waveBuffer2;
         private byte WaveLength2 => memory[0xff16];
         private int WaveDuty2 => WaveLength2 >> 6;
         private int Length2 => (64 - (WaveLength2 & 0x3F)) * 3;     // Should be 4 but sounds better/faster this way
@@ -119,10 +117,8 @@ namespace ZarthGB
         private double Volume2 => (Envelope2 >> 4) / 15.0;
         private bool EnvelopeAmplify2 => (Envelope2 & 0x8) != 0;
         private int EnvelopePeriod2 => (Envelope2 & 0x7);
-        private byte FrequencyLow2 => memory[0xff18];
-        private byte FrequencyHigh2 => (byte)(memory[0xff19] & 7);
         private bool TriggerSound2 => (memory[0xff19] >> 7) != 0;
-        private int Frequency2 => (FrequencyHigh2 << 8) | FrequencyLow2;
+        private int Frequency2 => ((memory[0xff19] & 7) << 8) | memory[0xff18];
         private bool Loop2 => (memory[0xff19] & 0x40) == 0;
 
         public void StartSound2()
@@ -130,6 +126,7 @@ namespace ZarthGB
             if (TriggerSound2)
             {
                 var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
+                        Channel = GBSignalGenerator.ChannelType.Square,
                         Gain = Volume2, 
                         Frequency = Frequency2, 
                         WaveDuty = WaveDuty2,
@@ -138,7 +135,7 @@ namespace ZarthGB
                     }
                     .Take(TimeSpan.FromMilliseconds(Length2));
                 
-                Debug.Print($"QUEUE Freq {Frequency2}, Duration {Length2}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
+                //Debug.Print($"QUEUE SQUARE Freq {Frequency2}, Duration {Length2}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
                 
                 var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond / 4];
                 var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
@@ -159,7 +156,101 @@ namespace ZarthGB
         }
 
         #endregion
+
+        #region Sound3
+        private WaveOutEvent waveOut3 = new WaveOutEvent();
+        private BufferedWaveProvider waveBuffer3;
+        private bool SoundOn3 => (memory[0xff1a] & 0x7) != 0;
+        private int Length3 => (int)(((256 - memory[0xff1b]) * 3) / 4);
+        private int OutputLevel3 => (memory[0xff1c] & 0x60) >> 5;
+        private bool TriggerSound3 => (memory[0xff1e] >> 7) != 0;
+        private int Frequency3 => (memory[0xff1e] & 7) << 8 | memory[0xff1d];        
+        private bool Loop3 => (memory[0xff1e] & 0x40) == 0;
+        private int WaveRamStart = 0xff30;
         
+        public void StartSound3()
+        {
+            if (TriggerSound3)
+            {
+                int [] samples = new int[32]
+                {
+                    memory[WaveRamStart] >> 4, 
+                    (memory[WaveRamStart] + 1) >> 4, 
+                    (memory[WaveRamStart] + 2) >> 4,   
+                    (memory[WaveRamStart] + 3) >> 4, 
+                    (memory[WaveRamStart] + 4) >> 4, 
+                    (memory[WaveRamStart] + 5) >> 4, 
+                    (memory[WaveRamStart] + 6) >> 4, 
+                    (memory[WaveRamStart] + 7) >> 4, 
+                    (memory[WaveRamStart] + 9) >> 4, 
+                    (memory[WaveRamStart] + 8) >> 4, 
+                    (memory[WaveRamStart] + 10) >> 4,
+                    (memory[WaveRamStart] + 11) >> 4,
+                    (memory[WaveRamStart] + 12) >> 4,
+                    (memory[WaveRamStart] + 13) >> 4,
+                    (memory[WaveRamStart] + 14) >> 4,
+                    (memory[WaveRamStart] + 15) >> 4,
+                    memory[WaveRamStart] & 0xF,
+                    (memory[WaveRamStart] + 1) & 0xF,
+                    (memory[WaveRamStart] + 2) & 0xF,
+                    (memory[WaveRamStart] + 3) & 0xF,
+                    (memory[WaveRamStart] + 4) & 0xF,
+                    (memory[WaveRamStart] + 5) & 0xF,
+                    (memory[WaveRamStart] + 6) & 0xF,
+                    (memory[WaveRamStart] + 7) & 0xF,
+                    (memory[WaveRamStart] + 9) & 0xF,
+                    (memory[WaveRamStart] + 8) & 0xF,
+                    (memory[WaveRamStart] + 10) & 0xF,
+                    (memory[WaveRamStart] + 11) & 0xF,
+                    (memory[WaveRamStart] + 12) & 0xF,
+                    (memory[WaveRamStart] + 13) & 0xF,
+                    (memory[WaveRamStart] + 14) & 0xF,
+                    (memory[WaveRamStart] + 15) & 0xF,
+                };
+                
+                var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
+                        Channel = GBSignalGenerator.ChannelType.Samples,
+                        Frequency = Frequency3, 
+                        Samples = samples,
+                        OutputShift = Pattern2Shift(OutputLevel3)
+                    }
+                    .Take(TimeSpan.FromMilliseconds(Length3));
+                
+                Debug.Print($"{stopwatch.ElapsedMilliseconds} QUEUE SAMPLE Freq {Frequency3}, Duration {Length3}, VolShift {Pattern2Shift(OutputLevel3)}, Loop {Loop3}");
+                
+                var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond * Length3 / 1000];
+                var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                waveBuffer3.AddSamples(buffer, 0, bytes);
+                
+                SetSound3On();
+            }
+        }
+
+        private int Pattern2Shift(int outputLevel)
+        {
+            switch (outputLevel)
+            {
+                case 0: return 4;
+                case 1: return 0;
+                case 2: return 1;
+                case 3: return 2;
+                default: throw new Exception("Invalid output level");
+            }
+        }
+        
+        private void SetSound3On()
+        {
+            OnOff = (byte) (OnOff | 0x04);
+        }
+
+        private void SetSound3Off()
+        {
+            OnOff = (byte) (OnOff & 0xFB);      // 11111011
+        }
+        
+        #endregion
+
+
         public Sound(Memory memory)
         {
             this.memory = memory;
@@ -167,12 +258,18 @@ namespace ZarthGB
 
             waveBuffer1 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer2 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
+            waveBuffer3 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveOut1.Init(waveBuffer1);
             waveOut2.Init(waveBuffer2);
+            waveOut3.Init(waveBuffer3);
         }
 
         public void Reset()
         {
+            stopwatch.Restart();
+            //SetSound1Off();
+            //SetSound2Off();
+            //SetSound3Off();
         }
 
         public void Play()
@@ -190,18 +287,13 @@ namespace ZarthGB
                     waveOut2.Play();
                 SetSound2Off();
             }
-        }
-    }
 
-    class QueuedSound
-    {
-        public ISampleProvider Wave { get; set; }
-        public bool Loop { get; set; }
-
-        public QueuedSound(ISampleProvider wave, bool loop)
-        {
-            Wave = wave;
-            Loop = loop;
+            if (Sound3On)
+            {
+                if (waveOut3.PlaybackState != PlaybackState.Playing)
+                    waveOut3.Play();
+                SetSound3Off();
+            }
         }
     }
 }

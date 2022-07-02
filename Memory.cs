@@ -163,6 +163,7 @@ namespace ZarthGB
 			for (int i = 0; i < ioReset.Length; i++)
 				memory[0xff00 + i] = ioReset[i];
 
+			#region Init FF registers
 			memory[0xFF05] = 0x00;
 			memory[0xFF06] = 0x00;
 			memory[0xFF07] = 0x00;
@@ -195,6 +196,7 @@ namespace ZarthGB
 			memory[0xFF4B] = 0x00;
 			memory[0xFF50] = 0x00;	// Enable Boot ROM (explicitly added)
 			memory[0xFFFF] = 0x00;
+			#endregion
 		}
 
 		public void SetCartridge(byte[] cart, Cartridge.RomType romType)
@@ -337,6 +339,8 @@ namespace ZarthGB
 			        sound.StartSound1();
 		        else if (address == 0xff19)
 			        sound.StartSound2();
+		        else if (address == 0xff1e)
+			        sound.StartSound3();
 
 		        // OAM DMA
 		        else if (address == 0xff46)
