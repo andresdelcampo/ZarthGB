@@ -31,6 +31,7 @@ namespace ZarthGB
         private int envelopePeriod;
         private int shadowFrequency;
         private int sweepTimer;
+        private byte lfsr;
         
         public WaveFormat WaveFormat { get; }
         public int WaveDuty { get; set; }
@@ -41,6 +42,9 @@ namespace ZarthGB
         public bool EnvelopeAmplify { get; set; }
         public int[] Samples = new int[32];
         public int OutputShift { get; set; }
+        public int CounterFrequency { get; set; }
+        public bool CounterStep { get; set; }
+        public int CounterDividingRatio { get; set; }
 
         public double Gain
         {
@@ -49,6 +53,7 @@ namespace ZarthGB
             {
                 gain = value;
                 currentVolume = (int) (15 * gain);
+                lfsr = (byte)currentVolume;
             }
         }
 
@@ -91,7 +96,6 @@ namespace ZarthGB
                         ApplySquareWave();
                         ApplyEnvelope();
                         ApplySweep();
-
                         sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 5: -gain * 5;
                         nSample++;
 
@@ -99,26 +103,35 @@ namespace ZarthGB
                     case ChannelType.Square:
                         ApplySquareWave();
                         ApplyEnvelope();
-
                         sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 4: -gain * 4;
                         nSample++;
                         break;
                     
                     case ChannelType.Samples:
-                        if (frequencyTimer == 0)
-                        {
-                            waveDutyPosition = (waveDutyPosition + 1) % Samples.Length;
-                            frequencyTimer = frequencyTimerStart;
-                        }
-                        else
-                            frequencyTimer--;
-                        
+                        ApplySamples();
                         sample = (Samples[waveDutyPosition] >> OutputShift) / 15.0;
                         nSample++;
                         break;
                     
                     case ChannelType.Noise:
-                        sample = 0.0;
+                       
+                        if (frequencyTimer == 0)
+                        {
+                            frequencyTimer = (CounterDividingRatio > 0 ? (CounterDividingRatio << 4) : 8) << CounterFrequency;
+
+                            byte xorResult = (byte) ((lfsr & 0b01) ^ ((lfsr & 0b10) >> 1));
+                            lfsr = (byte) ((lfsr >> 1) | (xorResult << 14));
+
+                            if (CounterStep) 
+                            {
+                                lfsr = (byte) (lfsr & ~(1 << 6));
+                                lfsr = (byte) (lfsr | (xorResult << 6));
+                            }
+                        }
+                        
+                        ApplyEnvelope();
+                        
+                        sample =  ((~lfsr & 0x01) == 1) ? gain : -gain;
                         break;
                     default:
                         sample = 0.0;
@@ -129,6 +142,17 @@ namespace ZarthGB
                   buffer[bufOffset++] = (float) sample;
             }
             return count;
+        }
+
+        private void ApplySamples()
+        {
+            if (frequencyTimer == 0)
+            {
+                waveDutyPosition = (waveDutyPosition + 1) % Samples.Length;
+                frequencyTimer = frequencyTimerStart;
+            }
+            else
+                frequencyTimer--;
         }
 
         private void ApplySquareWave()

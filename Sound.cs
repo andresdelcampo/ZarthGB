@@ -18,6 +18,8 @@ namespace ZarthGB
         private const int SampleRate = 192000;    // Minimum 192kHz to get enough frequency resolution -else sounds distorted
         private const int NumChannels = 1;
         private Stopwatch stopwatch = new Stopwatch();
+        private MixingWaveProvider32 mixer;
+        private WaveOut waveOut = new WaveOut();
         
         private byte ChannelControl => memory[0xff24];
         private int RightVolume => (ChannelControl >> 4) & 7;
@@ -35,9 +37,9 @@ namespace ZarthGB
         private bool Sound1On => (OnOff & 1) != 0;
         private bool Sound2On => (OnOff & 1 << 1) != 0;
         private bool Sound3On => (OnOff & 1 << 2) != 0;
+        private bool Sound4On => (OnOff & 1 << 3) != 0;
         
         #region Sound1
-        private WaveOutEvent waveOut1 = new WaveOutEvent();
         private BufferedWaveProvider waveBuffer1;
         private Dictionary<string, byte[]> bufferCache1 = new Dictionary<string, byte[]>();
         private byte Sweep1 => memory[0xff10];
@@ -128,7 +130,6 @@ namespace ZarthGB
         #endregion
 
         #region Sound2
-        private WaveOutEvent waveOut2 = new WaveOutEvent();
         private BufferedWaveProvider waveBuffer2;
         private Dictionary<string, byte[]> bufferCache2 = new Dictionary<string, byte[]>();
         private byte WaveLength2 => memory[0xff16];
@@ -193,11 +194,10 @@ namespace ZarthGB
         #endregion
 
         #region Sound3
-        private WaveOutEvent waveOut3 = new WaveOutEvent();
         private BufferedWaveProvider waveBuffer3;
         private Dictionary<string, byte[]> bufferCache3 = new Dictionary<string, byte[]>();
         private bool SoundOn3 => (memory[0xff1a] & 0x7) != 0;
-        private int Length3 => (int)(((256 - memory[0xff1b]) * 3) / 4);
+        private int Length3 => (int)(((256 - memory[0xff1b]) * 3.0) / 4.0);
         private int OutputLevel3 => (memory[0xff1c] & 0x60) >> 5;
         private bool TriggerSound3 => (memory[0xff1e] >> 7) != 0;
         private int Frequency3 => (memory[0xff1e] & 7) << 8 | memory[0xff1d];        
@@ -303,7 +303,88 @@ namespace ZarthGB
         
         #endregion
 
+        #region Sound4
+        private BufferedWaveProvider waveBuffer4;
+        private Dictionary<string, byte[]> bufferCache4 = new Dictionary<string, byte[]>();
+        private int Length4 => (64 - (memory[0xff20] & 0x3F)) * 3;     // Should be 4 but sounds better/faster this way
+        private byte Envelope4 => memory[0xff21];
+        private double Volume4 => (Envelope4 >> 4) / 15.0;
+        private bool EnvelopeAmplify4 => (Envelope4 & 0x8) != 0;
+        private int EnvelopePeriod4 => (Envelope4 & 0x7);
+        private byte PolynomialCounter => memory[0xff22];
+        private int CounterFrequency => (PolynomialCounter >> 4);
+        private bool CounterStep => (PolynomialCounter & 8) != 0;
+        private int CounterDividingRatio => (PolynomialCounter & 7);
+        private bool TriggerSound4 => (memory[0xff23] >> 7) != 0;
+        private bool Loop4 => (memory[0xff23] & 0x40) == 0;
 
+        public void StartSound4()
+        {
+            if (TriggerSound4)
+            {
+                byte[] buffer;
+                int bytes;
+                string key = $"{EnvelopeAmplify4}-{EnvelopePeriod4}-{Volume4}-{CounterFrequency}-{CounterStep}-{CounterDividingRatio}";
+                
+                if (bufferCache4.ContainsKey(key))
+                {
+                    buffer = bufferCache4[key];
+                    bytes = buffer.Length;
+                }
+                else
+                {
+                    var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
+                            Channel = GBSignalGenerator.ChannelType.Noise,
+                            Gain = Volume4, 
+                            CounterFrequency = CounterFrequency,
+                            CounterStep = CounterStep,
+                            CounterDividingRatio = Divisor(CounterDividingRatio),
+                            EnvelopeAmplify = EnvelopeAmplify4,
+                            EnvelopePeriod = EnvelopePeriod4,
+                        }
+                        .Take(TimeSpan.FromMilliseconds(Length4));
+                
+                    //Debug.Print($"QUEUE NOISE Freq {CounterFrequency}, Duration {Length4}, Vol {Volume4}, Env {EnvelopeAmplify4}, EnvPeriod {EnvelopePeriod4}, EnvStep {CounterStep}, EnvDiv {Divisor(CounterDividingRatio)}, Loop {Loop4}");
+                
+                    buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond * Length4 / 1000];
+                    bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                    bufferCache4[key] = buffer;
+                }
+                
+                waveBuffer4.AddSamples(buffer, 0, bytes);
+                
+                SetSound4On();
+            }
+        }
+
+        private int Divisor(int dividingRatio)
+        {
+            switch (dividingRatio)
+            {
+                case 0: return  8;
+                case 1: return 16;
+                case 2: return 32;
+                case 3: return 48;
+                case 4: return 64;
+                case 5: return 80;
+                case 6: return 96;
+                case 7: return 112;
+                default: throw new Exception("Invalid dividing ratio");
+            };
+        }
+        
+        private void SetSound4On()
+        {
+            OnOff = (byte) (OnOff | 0x08);
+        }
+
+        private void SetSound4Off()
+        {
+            OnOff = (byte) (OnOff & 0xF7);      // 11110111
+        }
+        
+        #endregion
+        
         public Sound(Memory memory)
         {
             this.memory = memory;
@@ -312,48 +393,28 @@ namespace ZarthGB
             waveBuffer1 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer2 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer3 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
+            waveBuffer4 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer1.BufferDuration = TimeSpan.FromMilliseconds(1000);
             waveBuffer2.BufferDuration = TimeSpan.FromMilliseconds(1000);
             waveBuffer3.BufferDuration = TimeSpan.FromMilliseconds(1000);
+            waveBuffer4.BufferDuration = TimeSpan.FromMilliseconds(1000);
             waveBuffer1.DiscardOnBufferOverflow = true;
             waveBuffer2.DiscardOnBufferOverflow = true;
             waveBuffer3.DiscardOnBufferOverflow = true;
-            waveOut1.Init(waveBuffer1);
-            waveOut2.Init(waveBuffer2);
-            waveOut3.Init(waveBuffer3);
-            //var mixer = new MixingSampleProvider(new WaveBuffer[3] {waveBuffer1, waveBuffer2, waveBuffer3} );
+            waveBuffer4.DiscardOnBufferOverflow = true;
+            mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2, waveBuffer3, waveBuffer4 } );
+            waveOut.Init(mixer);
         }
 
         public void Reset()
         {
             stopwatch.Restart();
-            //SetSound1Off();
-            //SetSound2Off();
-            //SetSound3Off();
         }
 
         public void Play()
         {
-            if (Sound1On)
-            {
-                if (waveOut1.PlaybackState != PlaybackState.Playing)
-                    waveOut1.Play();
-                SetSound1Off();
-            }
-
-            if (Sound2On)
-            {
-                if (waveOut2.PlaybackState != PlaybackState.Playing)
-                    waveOut2.Play();
-                SetSound2Off();
-            }
-
-            if (Sound3On)
-            {
-                if (waveOut3.PlaybackState != PlaybackState.Playing)
-                    waveOut3.Play();
-                SetSound3Off();
-            }
+            if (Sound1On || Sound2On || Sound3On  || Sound4On)
+                waveOut.Play();
         }
     }
 }

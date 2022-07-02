@@ -341,6 +341,8 @@ namespace ZarthGB
 			        sound.StartSound2();
 		        else if (address == 0xff1e)
 			        sound.StartSound3();
+		        else if (address == 0xff23)
+			        sound.StartSound4();
 
 		        // OAM DMA
 		        else if (address == 0xff46)
