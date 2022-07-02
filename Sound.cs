@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 // References:
 // - http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf probably the best GameBoy CPU/memory manual
@@ -36,6 +39,7 @@ namespace ZarthGB
         #region Sound1
         private WaveOutEvent waveOut1 = new WaveOutEvent();
         private BufferedWaveProvider waveBuffer1;
+        private Dictionary<string, byte[]> bufferCache1 = new Dictionary<string, byte[]>();
         private byte Sweep1 => memory[0xff10];
         private int SweepShift => Sweep1 & 0x7; 
         private bool SweepAmplify => (Sweep1 & 0x8) == 0;
@@ -55,40 +59,56 @@ namespace ZarthGB
         {
             if (TriggerSound1)
             {
-                ISampleProvider waveSound;
-                if (SweepPeriod == 0)
+                byte[] buffer;
+                int bytes;
+                string key = $"{Frequency1}-{WaveDuty1}-{EnvelopeAmplify1}-{EnvelopePeriod1}-{SweepAmplify}-{SweepPeriod}-{SweepShift}-{Volume1}";
+
+                if (bufferCache1.ContainsKey(key))
                 {
-                    // No sweep
-                    waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
-                            Channel = GBSignalGenerator.ChannelType.Square,
-                            Gain = Volume1, 
-                            Frequency = Frequency1,
-                            WaveDuty = WaveDuty1,
-                            EnvelopeAmplify = EnvelopeAmplify1,
-                            EnvelopePeriod = EnvelopePeriod1,
-                        }
-                        .Take(TimeSpan.FromMilliseconds(Length1));
+                    buffer = bufferCache1[key];
+                    bytes = buffer.Length;
                 }
                 else
                 {
-                    // Sweep
-                    waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
-                            Channel = GBSignalGenerator.ChannelType.Sweep,
-                            Gain = Volume1, 
-                            Frequency = Frequency1,
-                            WaveDuty = WaveDuty1,
-                            EnvelopeAmplify = EnvelopeAmplify1,
-                            EnvelopePeriod = EnvelopePeriod1,
-                            SweepPeriod = SweepPeriod,
-                            SweepAmplify = SweepAmplify,
-                            SweepShift = SweepShift,
-                        }
-                        .Take(TimeSpan.FromMilliseconds(Length1));
-                    Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
+                    ISampleProvider waveSound;
+                    if (SweepPeriod == 0)
+                    {
+                        // No sweep
+                        waveSound = new GBSignalGenerator(SampleRate, NumChannels)
+                            {
+                                Channel = GBSignalGenerator.ChannelType.Square,
+                                Gain = Volume1,
+                                Frequency = Frequency1,
+                                WaveDuty = WaveDuty1,
+                                EnvelopeAmplify = EnvelopeAmplify1,
+                                EnvelopePeriod = EnvelopePeriod1,
+                            }
+                            .Take(TimeSpan.FromMilliseconds(Length1));
+                    }
+                    else
+                    {
+                        // Sweep
+                        waveSound = new GBSignalGenerator(SampleRate, NumChannels)
+                            {
+                                Channel = GBSignalGenerator.ChannelType.Sweep,
+                                Gain = Volume1,
+                                Frequency = Frequency1,
+                                WaveDuty = WaveDuty1,
+                                EnvelopeAmplify = EnvelopeAmplify1,
+                                EnvelopePeriod = EnvelopePeriod1,
+                                SweepPeriod = SweepPeriod,
+                                SweepAmplify = SweepAmplify,
+                                SweepShift = SweepShift,
+                            }
+                            .Take(TimeSpan.FromMilliseconds(Length1));
+                        Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
+                    }
+
+                    buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond * Length1 / 1000];
+                    bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                    bufferCache1[key] = buffer;
                 }
-                
-                var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond / 4];
-                var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+
                 waveBuffer1.AddSamples(buffer, 0, bytes);
                 
                 SetSound1On();
@@ -110,6 +130,7 @@ namespace ZarthGB
         #region Sound2
         private WaveOutEvent waveOut2 = new WaveOutEvent();
         private BufferedWaveProvider waveBuffer2;
+        private Dictionary<string, byte[]> bufferCache2 = new Dictionary<string, byte[]>();
         private byte WaveLength2 => memory[0xff16];
         private int WaveDuty2 => WaveLength2 >> 6;
         private int Length2 => (64 - (WaveLength2 & 0x3F)) * 3;     // Should be 4 but sounds better/faster this way
@@ -125,20 +146,34 @@ namespace ZarthGB
         {
             if (TriggerSound2)
             {
-                var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
-                        Channel = GBSignalGenerator.ChannelType.Square,
-                        Gain = Volume2, 
-                        Frequency = Frequency2, 
-                        WaveDuty = WaveDuty2,
-                        EnvelopeAmplify = EnvelopeAmplify2,
-                        EnvelopePeriod = EnvelopePeriod2,
-                    }
-                    .Take(TimeSpan.FromMilliseconds(Length2));
+                byte[] buffer;
+                int bytes;
+                string key = $"{Frequency2}-{WaveDuty2}-{EnvelopeAmplify2}-{EnvelopePeriod2}-{Volume2}";
+
+                if (bufferCache2.ContainsKey(key))
+                {
+                    buffer = bufferCache2[key];
+                    bytes = buffer.Length;
+                }
+                else
+                {
+                    var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
+                            Channel = GBSignalGenerator.ChannelType.Square,
+                            Gain = Volume2, 
+                            Frequency = Frequency2, 
+                            WaveDuty = WaveDuty2,
+                            EnvelopeAmplify = EnvelopeAmplify2,
+                            EnvelopePeriod = EnvelopePeriod2,
+                        }
+                        .Take(TimeSpan.FromMilliseconds(Length2));
                 
-                //Debug.Print($"QUEUE SQUARE Freq {Frequency2}, Duration {Length2}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
+                    //Debug.Print($"QUEUE SQUARE Freq {Frequency2}, Duration {Length2}, Vol {Volume2}, Amplify {EnvelopeAmplify2}, Period {EnvelopePeriod2}, Loop {Loop2}");
                 
-                var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond / 4];
-                var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                    buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond * Length2 / 1000];
+                    bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                    bufferCache2[key] = buffer;
+                }
+                
                 waveBuffer2.AddSamples(buffer, 0, bytes);
                 
                 SetSound2On();
@@ -160,6 +195,7 @@ namespace ZarthGB
         #region Sound3
         private WaveOutEvent waveOut3 = new WaveOutEvent();
         private BufferedWaveProvider waveBuffer3;
+        private Dictionary<string, byte[]> bufferCache3 = new Dictionary<string, byte[]>();
         private bool SoundOn3 => (memory[0xff1a] & 0x7) != 0;
         private int Length3 => (int)(((256 - memory[0xff1b]) * 3) / 4);
         private int OutputLevel3 => (memory[0xff1c] & 0x60) >> 5;
@@ -172,18 +208,21 @@ namespace ZarthGB
         {
             if (TriggerSound3)
             {
-                int [] samples = new int[32]
+                byte[] buffer;
+                int bytes;
+
+                int[] samples = 
                 {
-                    memory[WaveRamStart] >> 4, 
-                    (memory[WaveRamStart] + 1) >> 4, 
-                    (memory[WaveRamStart] + 2) >> 4,   
-                    (memory[WaveRamStart] + 3) >> 4, 
-                    (memory[WaveRamStart] + 4) >> 4, 
-                    (memory[WaveRamStart] + 5) >> 4, 
-                    (memory[WaveRamStart] + 6) >> 4, 
-                    (memory[WaveRamStart] + 7) >> 4, 
-                    (memory[WaveRamStart] + 9) >> 4, 
-                    (memory[WaveRamStart] + 8) >> 4, 
+                    memory[WaveRamStart] >> 4,
+                    (memory[WaveRamStart] + 1) >> 4,
+                    (memory[WaveRamStart] + 2) >> 4,
+                    (memory[WaveRamStart] + 3) >> 4,
+                    (memory[WaveRamStart] + 4) >> 4,
+                    (memory[WaveRamStart] + 5) >> 4,
+                    (memory[WaveRamStart] + 6) >> 4,
+                    (memory[WaveRamStart] + 7) >> 4,
+                    (memory[WaveRamStart] + 9) >> 4,
+                    (memory[WaveRamStart] + 8) >> 4,
                     (memory[WaveRamStart] + 10) >> 4,
                     (memory[WaveRamStart] + 11) >> 4,
                     (memory[WaveRamStart] + 12) >> 4,
@@ -207,19 +246,33 @@ namespace ZarthGB
                     (memory[WaveRamStart] + 14) & 0xF,
                     (memory[WaveRamStart] + 15) & 0xF,
                 };
-                
-                var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
-                        Channel = GBSignalGenerator.ChannelType.Samples,
-                        Frequency = Frequency3, 
-                        Samples = samples,
-                        OutputShift = Pattern2Shift(OutputLevel3)
-                    }
-                    .Take(TimeSpan.FromMilliseconds(Length3));
-                
-                Debug.Print($"{stopwatch.ElapsedMilliseconds} QUEUE SAMPLE Freq {Frequency3}, Duration {Length3}, VolShift {Pattern2Shift(OutputLevel3)}, Loop {Loop3}");
-                
-                var buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond * Length3 / 1000];
-                var bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+
+                string key = $"{Frequency3}-{OutputLevel3}-{samples.Sum()}";
+
+                if (bufferCache3.ContainsKey(key))
+                {
+                    buffer = bufferCache3[key];
+                    bytes = buffer.Length;
+                }
+                else
+                {
+                    var waveSound = new GBSignalGenerator(SampleRate, NumChannels)
+                        {
+                            Channel = GBSignalGenerator.ChannelType.Samples,
+                            Frequency = Frequency3,
+                            Samples = samples,
+                            OutputShift = Pattern2Shift(OutputLevel3)
+                        }
+                        .Take(TimeSpan.FromMilliseconds(Length3));
+
+                    Debug.Print(
+                        $"{stopwatch.ElapsedMilliseconds} QUEUE SAMPLE Freq {Frequency3}, Duration {Length3}, VolShift {Pattern2Shift(OutputLevel3)}, Loop {Loop3}");
+
+                    buffer = new byte[waveSound.WaveFormat.AverageBytesPerSecond * Length3 / 1000];
+                    bytes = waveSound.ToWaveProvider().Read(buffer, 0, buffer.Length);
+                    bufferCache3[key] = buffer;
+                }
+
                 waveBuffer3.AddSamples(buffer, 0, bytes);
                 
                 SetSound3On();
@@ -259,9 +312,16 @@ namespace ZarthGB
             waveBuffer1 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer2 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer3 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
+            waveBuffer1.BufferDuration = TimeSpan.FromMilliseconds(1000);
+            waveBuffer2.BufferDuration = TimeSpan.FromMilliseconds(1000);
+            waveBuffer3.BufferDuration = TimeSpan.FromMilliseconds(1000);
+            waveBuffer1.DiscardOnBufferOverflow = true;
+            waveBuffer2.DiscardOnBufferOverflow = true;
+            waveBuffer3.DiscardOnBufferOverflow = true;
             waveOut1.Init(waveBuffer1);
             waveOut2.Init(waveBuffer2);
             waveOut3.Init(waveBuffer3);
+            //var mixer = new MixingSampleProvider(new WaveBuffer[3] {waveBuffer1, waveBuffer2, waveBuffer3} );
         }
 
         public void Reset()

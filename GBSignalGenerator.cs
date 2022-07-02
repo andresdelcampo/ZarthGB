@@ -81,10 +81,10 @@ namespace ZarthGB
         
         public int Read(float[] buffer, int offset, int count)
         {
-            int num1 = offset;
+            int bufOffset = offset;
             for (int index1 = 0; index1 < count / WaveFormat.Channels; ++index1)
             {
-                double num2;
+                double sample;
                 switch (Channel)
                 { 
                     case ChannelType.Sweep:
@@ -92,7 +92,7 @@ namespace ZarthGB
                         ApplyEnvelope();
                         ApplySweep();
 
-                        num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 5: -gain * 5;
+                        sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 5: -gain * 5;
                         nSample++;
 
                         break;
@@ -100,7 +100,7 @@ namespace ZarthGB
                         ApplySquareWave();
                         ApplyEnvelope();
 
-                        num2 = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 4: -gain * 4;
+                        sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 4: -gain * 4;
                         nSample++;
                         break;
                     
@@ -113,20 +113,20 @@ namespace ZarthGB
                         else
                             frequencyTimer--;
                         
-                        num2 = (Samples[waveDutyPosition] >> OutputShift) / 15.0;
+                        sample = (Samples[waveDutyPosition] >> OutputShift) / 15.0;
                         nSample++;
                         break;
                     
                     case ChannelType.Noise:
-                        num2 = 0.0;
+                        sample = 0.0;
                         break;
                     default:
-                        num2 = 0.0;
+                        sample = 0.0;
                         break;
                 }
                 
                 for (int index2 = 0; index2 < WaveFormat.Channels; ++index2)
-                  buffer[num1++] = (float) num2;
+                  buffer[bufOffset++] = (float) sample;
             }
             return count;
         }
