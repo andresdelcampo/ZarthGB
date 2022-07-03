@@ -140,8 +140,8 @@ namespace ZarthGB
 		{
 			memory[0xff04]++;
 
-			// 1024 times per second or less to keep sound channels synchronized
-			if (memory[0xff04] % 16 == 0)
+			// Modulo 16 (1024 times per second or less to keep sound channels synchronized)
+			if (memory[0xff04] % 32 == 0)
 				SoundStep();
 		}
 

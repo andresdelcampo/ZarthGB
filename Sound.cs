@@ -63,7 +63,7 @@ namespace ZarthGB
             {
                 byte[] buffer;
                 int bytes;
-                string key = $"{Frequency1}-{WaveDuty1}-{EnvelopeAmplify1}-{EnvelopePeriod1}-{SweepAmplify}-{SweepPeriod}-{SweepShift}-{Volume1}";
+                string key = $"{Length1}-{Frequency1}-{WaveDuty1}-{EnvelopeAmplify1}-{EnvelopePeriod1}-{SweepAmplify}-{SweepPeriod}-{SweepShift}-{Volume1}";
 
                 if (bufferCache1.ContainsKey(key))
                 {
@@ -149,7 +149,7 @@ namespace ZarthGB
             {
                 byte[] buffer;
                 int bytes;
-                string key = $"{Frequency2}-{WaveDuty2}-{EnvelopeAmplify2}-{EnvelopePeriod2}-{Volume2}";
+                string key = $"{Length2}-{Frequency2}-{WaveDuty2}-{EnvelopeAmplify2}-{EnvelopePeriod2}-{Volume2}";
 
                 if (bufferCache2.ContainsKey(key))
                 {
@@ -197,7 +197,7 @@ namespace ZarthGB
         private BufferedWaveProvider waveBuffer3;
         private Dictionary<string, byte[]> bufferCache3 = new Dictionary<string, byte[]>();
         private bool SoundOn3 => (memory[0xff1a] & 0x7) != 0;
-        private int Length3 => (int)(((256 - memory[0xff1b]) * 3.0) / 4.0);
+        private int Length3 => (int)(((double)(256 - memory[0xff1b]) * 3.0) / 4.0);
         private int OutputLevel3 => (memory[0xff1c] & 0x60) >> 5;
         private bool TriggerSound3 => (memory[0xff1e] >> 7) != 0;
         private int Frequency3 => (memory[0xff1e] & 7) << 8 | memory[0xff1d];        
@@ -214,40 +214,40 @@ namespace ZarthGB
                 int[] samples = 
                 {
                     memory[WaveRamStart] >> 4,
-                    (memory[WaveRamStart] + 1) >> 4,
-                    (memory[WaveRamStart] + 2) >> 4,
-                    (memory[WaveRamStart] + 3) >> 4,
-                    (memory[WaveRamStart] + 4) >> 4,
-                    (memory[WaveRamStart] + 5) >> 4,
-                    (memory[WaveRamStart] + 6) >> 4,
-                    (memory[WaveRamStart] + 7) >> 4,
-                    (memory[WaveRamStart] + 9) >> 4,
-                    (memory[WaveRamStart] + 8) >> 4,
-                    (memory[WaveRamStart] + 10) >> 4,
-                    (memory[WaveRamStart] + 11) >> 4,
-                    (memory[WaveRamStart] + 12) >> 4,
-                    (memory[WaveRamStart] + 13) >> 4,
-                    (memory[WaveRamStart] + 14) >> 4,
-                    (memory[WaveRamStart] + 15) >> 4,
                     memory[WaveRamStart] & 0xF,
-                    (memory[WaveRamStart] + 1) & 0xF,
-                    (memory[WaveRamStart] + 2) & 0xF,
-                    (memory[WaveRamStart] + 3) & 0xF,
-                    (memory[WaveRamStart] + 4) & 0xF,
-                    (memory[WaveRamStart] + 5) & 0xF,
-                    (memory[WaveRamStart] + 6) & 0xF,
-                    (memory[WaveRamStart] + 7) & 0xF,
-                    (memory[WaveRamStart] + 9) & 0xF,
-                    (memory[WaveRamStart] + 8) & 0xF,
-                    (memory[WaveRamStart] + 10) & 0xF,
-                    (memory[WaveRamStart] + 11) & 0xF,
-                    (memory[WaveRamStart] + 12) & 0xF,
-                    (memory[WaveRamStart] + 13) & 0xF,
-                    (memory[WaveRamStart] + 14) & 0xF,
-                    (memory[WaveRamStart] + 15) & 0xF,
+                    memory[WaveRamStart + 1] >> 4,
+                    memory[WaveRamStart + 1] & 0xF,
+                    memory[WaveRamStart + 2] >> 4,
+                    memory[WaveRamStart + 2] & 0xF,
+                    memory[WaveRamStart + 3] >> 4,
+                    memory[WaveRamStart + 3] & 0xF,
+                    memory[WaveRamStart + 4] >> 4,
+                    memory[WaveRamStart + 4] & 0xF,
+                    memory[WaveRamStart + 5] >> 4,
+                    memory[WaveRamStart + 5] & 0xF,
+                    memory[WaveRamStart + 6] >> 4,
+                    memory[WaveRamStart + 6] & 0xF,
+                    memory[WaveRamStart + 7] >> 4,
+                    memory[WaveRamStart + 7] & 0xF,
+                    memory[WaveRamStart + 8] >> 4,
+                    memory[WaveRamStart + 8] & 0xF,
+                    memory[WaveRamStart + 9] >> 4,
+                    memory[WaveRamStart + 9] & 0xF,
+                    memory[WaveRamStart + 10] >> 4,
+                    memory[WaveRamStart + 10] & 0xF,
+                    memory[WaveRamStart + 11] >> 4,
+                    memory[WaveRamStart + 11] & 0xF,
+                    memory[WaveRamStart + 12] >> 4,
+                    memory[WaveRamStart + 12] & 0xF,
+                    memory[WaveRamStart + 13] >> 4,
+                    memory[WaveRamStart + 13] & 0xF,
+                    memory[WaveRamStart + 14] >> 4,
+                    memory[WaveRamStart + 14] & 0xF,
+                    memory[WaveRamStart + 15] >> 4,
+                    memory[WaveRamStart + 15] & 0xF,
                 };
 
-                string key = $"{Frequency3}-{OutputLevel3}-{samples.Sum()}";
+                string key = $"{Length3}-{Frequency3}-{OutputLevel3}-{samples.Sum()}";
 
                 if (bufferCache3.ContainsKey(key))
                 {
@@ -312,8 +312,8 @@ namespace ZarthGB
         private bool EnvelopeAmplify4 => (Envelope4 & 0x8) != 0;
         private int EnvelopePeriod4 => (Envelope4 & 0x7);
         private byte PolynomialCounter => memory[0xff22];
-        private int CounterFrequency => (PolynomialCounter >> 4);
-        private bool CounterStep => (PolynomialCounter & 8) != 0;
+        private int CounterShift => (PolynomialCounter >> 4);
+        private bool CounterWidthMode => (PolynomialCounter & 8) != 0;
         private int CounterDividingRatio => (PolynomialCounter & 7);
         private bool TriggerSound4 => (memory[0xff23] >> 7) != 0;
         private bool Loop4 => (memory[0xff23] & 0x40) == 0;
@@ -324,7 +324,7 @@ namespace ZarthGB
             {
                 byte[] buffer;
                 int bytes;
-                string key = $"{EnvelopeAmplify4}-{EnvelopePeriod4}-{Volume4}-{CounterFrequency}-{CounterStep}-{CounterDividingRatio}";
+                string key = $"{Length4}-{EnvelopeAmplify4}-{EnvelopePeriod4}-{Volume4}-{CounterShift}-{CounterWidthMode}-{CounterDividingRatio}";
                 
                 if (bufferCache4.ContainsKey(key))
                 {
@@ -336,9 +336,9 @@ namespace ZarthGB
                     var waveSound = new GBSignalGenerator(SampleRate, NumChannels) { 
                             Channel = GBSignalGenerator.ChannelType.Noise,
                             Gain = Volume4, 
-                            CounterFrequency = CounterFrequency,
-                            CounterStep = CounterStep,
-                            CounterDividingRatio = Divisor(CounterDividingRatio),
+                            CounterShift = CounterShift,
+                            CounterWidthMode = CounterWidthMode,
+                            CounterDivisor = CounterDividingRatio,
                             EnvelopeAmplify = EnvelopeAmplify4,
                             EnvelopePeriod = EnvelopePeriod4,
                         }
@@ -355,22 +355,6 @@ namespace ZarthGB
                 
                 SetSound4On();
             }
-        }
-
-        private int Divisor(int dividingRatio)
-        {
-            switch (dividingRatio)
-            {
-                case 0: return  8;
-                case 1: return 16;
-                case 2: return 32;
-                case 3: return 48;
-                case 4: return 64;
-                case 5: return 80;
-                case 6: return 96;
-                case 7: return 112;
-                default: throw new Exception("Invalid dividing ratio");
-            };
         }
         
         private void SetSound4On()
@@ -403,6 +387,7 @@ namespace ZarthGB
             waveBuffer3.DiscardOnBufferOverflow = true;
             waveBuffer4.DiscardOnBufferOverflow = true;
             mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2, waveBuffer3, waveBuffer4 } );
+            //mixer = new MixingWaveProvider32(new [] { waveBuffer4 } );
             waveOut.Init(mixer);
         }
 

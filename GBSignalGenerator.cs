@@ -31,7 +31,8 @@ namespace ZarthGB
         private int envelopePeriod;
         private int shadowFrequency;
         private int sweepTimer;
-        private byte lfsr;
+        private ushort lfsr;
+        private double clockCorrection;
         
         public WaveFormat WaveFormat { get; }
         public int WaveDuty { get; set; }
@@ -42,9 +43,9 @@ namespace ZarthGB
         public bool EnvelopeAmplify { get; set; }
         public int[] Samples = new int[32];
         public int OutputShift { get; set; }
-        public int CounterFrequency { get; set; }
-        public bool CounterStep { get; set; }
-        public int CounterDividingRatio { get; set; }
+        public int CounterShift { get; set; }
+        public bool CounterWidthMode { get; set; }
+        public int CounterDivisor { get; set; }
 
         public double Gain
         {
@@ -53,7 +54,7 @@ namespace ZarthGB
             {
                 gain = value;
                 currentVolume = (int) (15 * gain);
-                lfsr = (byte)currentVolume;
+                lfsr = (ushort)currentVolume;
             }
         }
 
@@ -71,7 +72,6 @@ namespace ZarthGB
             {
                 frequency = value;
                 frequencyTimerStart = (2048 - (int)Frequency) * 4;
-                double clockCorrection = (double)WaveFormat.SampleRate / (double)(4.19*1024*1024);  // 4.19 MHz 
                 frequencyTimerStart = (int) (frequencyTimerStart * clockCorrection);    
                 frequencyTimer = 0;
                 waveDutyPosition = 0;
@@ -82,6 +82,7 @@ namespace ZarthGB
         {
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
             Gain = 1.0;
+            clockCorrection = (double)WaveFormat.SampleRate / (double)(4.19*1024*1024);  // 4.19 MHz 
         }
         
         public int Read(float[] buffer, int offset, int count)
@@ -96,43 +97,30 @@ namespace ZarthGB
                         ApplySquareWave();
                         ApplyEnvelope();
                         ApplySweep();
-                        sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 5: -gain * 5;
+                        sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain: -gain;
                         nSample++;
-
                         break;
+                    
                     case ChannelType.Square:
                         ApplySquareWave();
                         ApplyEnvelope();
-                        sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain * 4: -gain * 4;
+                        sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain: -gain;
                         nSample++;
                         break;
                     
                     case ChannelType.Samples:
                         ApplySamples();
-                        sample = (Samples[waveDutyPosition] >> OutputShift) / 15.0;
+                        sample = (((Samples[waveDutyPosition] & 0xF) >> OutputShift) - 7.5) / 7.5;
                         nSample++;
                         break;
                     
                     case ChannelType.Noise:
-                       
-                        if (frequencyTimer == 0)
-                        {
-                            frequencyTimer = (CounterDividingRatio > 0 ? (CounterDividingRatio << 4) : 8) << CounterFrequency;
-
-                            byte xorResult = (byte) ((lfsr & 0b01) ^ ((lfsr & 0b10) >> 1));
-                            lfsr = (byte) ((lfsr >> 1) | (xorResult << 14));
-
-                            if (CounterStep) 
-                            {
-                                lfsr = (byte) (lfsr & ~(1 << 6));
-                                lfsr = (byte) (lfsr | (xorResult << 6));
-                            }
-                        }
-                        
+                        ApplyNoise();
                         ApplyEnvelope();
-                        
-                        sample =  ((~lfsr & 0x01) == 1) ? gain : -gain;
+                        sample =  ((lfsr & 0x01) == 0) ? gain : -gain;
+                        nSample++;
                         break;
+                    
                     default:
                         sample = 0.0;
                         break;
@@ -142,6 +130,26 @@ namespace ZarthGB
                   buffer[bufOffset++] = (float) sample;
             }
             return count;
+        }
+
+        private void ApplyNoise()
+        {
+            if (frequencyTimer == 0)
+            {
+                frequencyTimer = (CounterDivisor > 0 ? (CounterDivisor << 4) : 8) << CounterShift;
+                frequencyTimer = (int) (frequencyTimer * clockCorrection);    
+
+                byte xorResult = (byte)((lfsr & 1) ^ ((lfsr & 2) >> 1));
+                lfsr = (ushort)((lfsr >> 1) | (xorResult << 14));
+
+                if (CounterWidthMode)
+                {
+                    lfsr = (ushort)(lfsr & ~0x40);
+                    lfsr = (ushort)(lfsr | (xorResult << 6));
+                }
+            }
+            else 
+                frequencyTimer--;
         }
 
         private void ApplySamples()
