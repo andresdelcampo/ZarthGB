@@ -33,7 +33,7 @@ namespace ZarthGB
         private int sweepTimer;
         private ushort lfsr;
         private double clockCorrection;
-        
+
         public WaveFormat WaveFormat { get; }
         public int WaveDuty { get; set; }
         public int SweepPeriod { get; set; }

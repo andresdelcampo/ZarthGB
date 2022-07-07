@@ -141,7 +141,7 @@ namespace ZarthGB
 			memory[0xff04]++;
 
 			// Modulo 16 (1024 times per second or less to keep sound channels synchronized)
-			if (memory[0xff04] % 32 == 0)
+			if (memory[0xff04] % (16384 / Sound.PlayStep) == 0)
 				SoundStep();
 		}
 
