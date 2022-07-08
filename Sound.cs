@@ -309,10 +309,13 @@ namespace ZarthGB
             waveBuffer2.ReadFully = false;
             waveBuffer3.ReadFully = false;
             waveBuffer4.ReadFully = false;
-            //mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2, waveBuffer3, waveBuffer4 } );
+            mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2, waveBuffer3, waveBuffer4 } );
             //mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2} );
-            mixer = new MixingWaveProvider32(new [] { waveBuffer1 } );
+            //mixer = new MixingWaveProvider32(new [] { waveBuffer1 } );
+            waveOut.DesiredLatency = PlayStep;
+            //waveOut.NumberOfBuffers = 4;
             waveOut.Init(mixer);
+            
             //waveOut.Init(waveBuffer);
             buffering = BufferingRounds;
         }
@@ -353,6 +356,7 @@ namespace ZarthGB
                         bufferCache1[key] = buffer;
                     }
                     waveBuffer1.AddSamples(buffer, 0, bytes);
+                    lengthPlayed1 += playLength;
                 }
                 else
                     SetSound1Off();
@@ -380,6 +384,7 @@ namespace ZarthGB
                         bufferCache2[key] = buffer;
                     }
                     waveBuffer2.AddSamples(buffer, 0, bytes);
+                    lengthPlayed2 += playLength;
                 }
                 else
                     SetSound2Off();
@@ -407,6 +412,7 @@ namespace ZarthGB
                         bufferCache3[key] = buffer;
                     }
                     waveBuffer3.AddSamples(buffer, 0, bytes);
+                    lengthPlayed3 += playLength;
                 }
                 else
                     SetSound3Off();
@@ -434,6 +440,7 @@ namespace ZarthGB
                         bufferCache4[key] = buffer;
                     }
                     waveBuffer4.AddSamples(buffer, 0, bytes);
+                    lengthPlayed4 += playLength;
                 }
                 else
                     SetSound4Off();
