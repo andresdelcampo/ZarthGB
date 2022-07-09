@@ -20,9 +20,9 @@ namespace ZarthGB
         private const int NumChannels = 1;
         private Stopwatch stopwatch = new Stopwatch();
         private TimeSpan lastTime;
-        private MixingWaveProvider32 mixer;
+        private MixingWaveProvider32 leftChannel, rightChannel;
+        private MultiplexingWaveProvider mixer;
         private WaveOut waveOut = new WaveOut();
-        private BufferedWaveProvider waveBuffer;
         private int buffering;
         private const int BufferingRounds = 4;
         
@@ -33,7 +33,16 @@ namespace ZarthGB
         private bool LeftOn => (ChannelControl & 0x08) != 0;
         
         private byte Output => memory[0xff25];
-
+        private bool Sound4ToRight => (Output & 0x80) != 0;
+        private bool Sound3ToRight => (Output & 0x40) != 0;
+        private bool Sound2ToRight => (Output & 0x20) != 0;
+        private bool Sound1ToRight => (Output & 0x10) != 0;
+        private bool Sound4ToLeft => (Output & 0x08) != 0;
+        private bool Sound3ToLeft => (Output & 0x04) != 0;
+        private bool Sound2ToLeft => (Output & 0x02) != 0;
+        private bool Sound1ToLeft => (Output & 0x01) != 0;
+        
+        
         private byte OnOff 
         {
             get => memory[0xff26];
@@ -299,16 +308,10 @@ namespace ZarthGB
             this.memory = memory;
             Reset();
 
-            waveBuffer = new BufferedWaveProvider(new WaveFormat(SampleRate, 2));
-
             waveBuffer1 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer2 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer3 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
             waveBuffer4 = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(SampleRate,NumChannels));
-            //waveBuffer1.BufferDuration = TimeSpan.FromMilliseconds(PlayStep*32);
-            //waveBuffer2.BufferDuration = TimeSpan.FromMilliseconds(PlayStep*32);
-            //waveBuffer3.BufferDuration = TimeSpan.FromMilliseconds(PlayStep*32);
-            //waveBuffer4.BufferDuration = TimeSpan.FromMilliseconds(PlayStep*32);
             waveBuffer1.DiscardOnBufferOverflow = true;
             waveBuffer2.DiscardOnBufferOverflow = true;
             waveBuffer3.DiscardOnBufferOverflow = true;
@@ -317,13 +320,20 @@ namespace ZarthGB
             waveBuffer2.ReadFully = false;
             waveBuffer3.ReadFully = false;
             waveBuffer4.ReadFully = false;
-            mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2, waveBuffer3, waveBuffer4 } );
-            //mixer = new MixingWaveProvider32(new [] { waveBuffer1, waveBuffer2} );
-            //mixer = new MixingWaveProvider32(new [] { waveBuffer1 } );
-            //waveOut.NumberOfBuffers = 4;
+
+            leftChannel = new MixingWaveProvider32();
+            rightChannel = new MixingWaveProvider32();
+            //leftChannel.AddInputStream(waveBuffer1);
+            leftChannel.AddInputStream(waveBuffer2);
+            leftChannel.AddInputStream(waveBuffer4);
+            rightChannel.AddInputStream(waveBuffer1);
+            rightChannel.AddInputStream(waveBuffer3);
+            rightChannel.AddInputStream(waveBuffer4);
+            mixer = new MultiplexingWaveProvider(new [] { leftChannel, rightChannel }, 2);
+            mixer.ConnectInputToOutput(0, 0);
+            mixer.ConnectInputToOutput(1, 1);
+
             waveOut.Init(mixer);
-            
-            //waveOut.Init(waveBuffer);
             buffering = BufferingRounds;
         }
 
@@ -481,7 +491,27 @@ namespace ZarthGB
                     if (buffering > 0)
                         buffering--; // Give time to the buffers to build up
                     else
+                    {
+                        /*leftChannel.RemoveInputStream(waveBuffer1);
+                        leftChannel.RemoveInputStream(waveBuffer2);
+                        leftChannel.RemoveInputStream(waveBuffer3);
+                        leftChannel.RemoveInputStream(waveBuffer4);
+                        if (Sound1ToLeft) leftChannel.AddInputStream(waveBuffer1);
+                        if (Sound2ToLeft) leftChannel.AddInputStream(waveBuffer2);
+                        if (Sound3ToLeft) leftChannel.AddInputStream(waveBuffer3);
+                        if (Sound4ToLeft) leftChannel.AddInputStream(waveBuffer4);
+                        
+                        rightChannel.RemoveInputStream(waveBuffer1);
+                        rightChannel.RemoveInputStream(waveBuffer2);
+                        rightChannel.RemoveInputStream(waveBuffer3);
+                        rightChannel.RemoveInputStream(waveBuffer4);
+                        if (Sound1ToRight) rightChannel.AddInputStream(waveBuffer1);
+                        if (Sound2ToRight) rightChannel.AddInputStream(waveBuffer2);
+                        if (Sound3ToRight) rightChannel.AddInputStream(waveBuffer3);
+                        if (Sound4ToRight) rightChannel.AddInputStream(waveBuffer4);*/
+                       
                         waveOut.Play();
+                    }
                 }
                 else
                     buffering = BufferingRounds;
