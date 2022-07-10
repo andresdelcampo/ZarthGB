@@ -132,8 +132,8 @@ namespace ZarthGB
 		
 		public Memory()
         {
+	        Reset();
 	        sound = new Sound(this);
-			Reset();
 		}
         
 		public void IncrementDiv()
@@ -343,6 +343,9 @@ namespace ZarthGB
 			        sound.StartSound3();
 		        else if (address == 0xff23)
 			        sound.StartSound4();
+		        else if ((address == 0xff24 && value != memory[0xff24]) ||
+						 (address == 0xff25 && value != memory[0xff25]))
+			        sound.SetSoundOutput();
 
 		        // OAM DMA
 		        else if (address == 0xff46)
