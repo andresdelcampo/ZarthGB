@@ -111,10 +111,13 @@ namespace ZarthGB
             get => memory.Ticks;
             private set
             {
-                if (memory.TimerEnabled)
+                int increment = value - memory.Ticks;
+                for (int i = 0; i < increment; i++)
                 {
-                    int increment = value - memory.Ticks;
-                    for (int i = 0; i < increment; i++)
+                    if ((memory.Ticks + i) % 268 == 0) // DIV goes 16384 times per second, so 1/268th of 4.19 MHz
+                        memory.IncrementDiv();
+                    
+                    if (memory.TimerEnabled)
                     {
                         if ((memory.Ticks + i) % memory.TimerTick == 0)
                         {
@@ -122,46 +125,37 @@ namespace ZarthGB
                             memory[0xff05] = (byte) (newCounterValue & 0xFF);
                             if (newCounterValue > 0xFF)
                             {
-                                //Debug.Print($"allTimerCounters {allTimerCounters.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}, Ticks {memory.Timer2.ElapsedTicks}, freq {(Stopwatch.Frequency*allTimerCounters)/memory.Timer2.ElapsedTicks}");
                                 memory[0xff05] = memory[0xff06];
                                 if ((InterruptEnable & InterruptsTimer) > 0)
                                 {
-                                    timesTriggered++;
                                     InterruptFlags |= InterruptsTimer;
-                                    //if (timesTriggered % 8 == 0 || memory.Timer2.ElapsedMilliseconds == 1000)
-                                        //Debug.Print($"timesTriggered {timesTriggered.ToString()}, Ms {memory.Timer2.ElapsedMilliseconds}");
                                 }
                             }
                         }
                     }
-
-                    // Process serial port if needed
-                    /*if (TransferInProgressTicks > 0)    // Transfer in progress
-                    {
-                        TransferInProgressTicks--;
-                        if (TransferInProgressTicks == 0)
-                        {
-                            memory[0xff01] = 0xFF; // No other GameBoy present
-                            if ((memory[0xffff] & Cpu.InterruptsSerial) > 0)
-                                memory[0xff0f] |= Cpu.InterruptsSerial;
-                        }
-                    }
-                    if (memory[0xff02] >> 7 > 0)    // New transfer
-                    {
-                        // Mark transfer finished -we don't have serial transfers here
-                        memory[0xff02] = (byte)(memory[0xff02] & 0x7F);
-                        TransferInProgressTicks = 8;
-                    }*/
-
                 }
                 
+                // Process serial port if needed
+                /*if (TransferInProgressTicks > 0)    // Transfer in progress
+                {
+                    TransferInProgressTicks--;
+                    if (TransferInProgressTicks == 0)
+                    {
+                        memory[0xff01] = 0xFF; // No other GameBoy present
+                        if ((memory[0xffff] & Cpu.InterruptsSerial) > 0)
+                            memory[0xff0f] |= Cpu.InterruptsSerial;
+                    }
+                }
+                if (memory[0xff02] >> 7 > 0)    // New transfer
+                {
+                    // Mark transfer finished -we don't have serial transfers here
+                    memory[0xff02] = (byte)(memory[0xff02] & 0x7F);
+                    TransferInProgressTicks = 8;
+                }*/
+
                 memory.Ticks = value;   
             }
         }
-        private Stopwatch divStopwatch = new Stopwatch();
-        private long divTick = Stopwatch.Frequency / 16384;
-        
-        private long timesTriggered = 0;
         
         private int[] normalInstructionHalfTicks = {
             2, 6, 4, 4, 2, 2, 4, 4, 10, 4, 4, 4, 2, 2, 4, 2, // 0x0_
@@ -329,9 +323,6 @@ namespace ZarthGB
         public Cpu(Memory memory)
         {
             this.memory = memory;
-            
-            divStopwatch.Start();
-            
             Reset();
         }
 
@@ -367,13 +358,6 @@ namespace ZarthGB
         public void Step()
         {
             InterruptStep();
-
-            // DIV timer (16384 times per second)
-            if (divStopwatch.ElapsedTicks > divTick)
-            {
-                divStopwatch.Restart();
-                memory.IncrementDiv();
-            }
 
             if (Stopped || Halted)
             {
