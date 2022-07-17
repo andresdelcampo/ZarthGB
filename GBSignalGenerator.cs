@@ -13,7 +13,6 @@ namespace ZarthGB
             Noise
         }
         
-        private int nSample;
         private string[] WaveDutyTable =
         {
             "00000001",
@@ -98,27 +97,23 @@ namespace ZarthGB
                         ApplyEnvelope();
                         ApplySweep();
                         sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain: -gain;
-                        nSample++;
                         break;
                     
                     case ChannelType.Square:
                         ApplySquareWave();
                         ApplyEnvelope();
                         sample = (WaveDutyTable[WaveDuty][waveDutyPosition] == '1') ? gain: -gain;
-                        nSample++;
                         break;
                     
                     case ChannelType.Samples:
                         ApplySamples();
                         sample = (((Samples[waveDutyPosition] & 0xF) >> OutputShift) - 7.5) / 7.5;
-                        nSample++;
                         break;
                     
                     case ChannelType.Noise:
                         ApplyNoise();
                         ApplyEnvelope();
                         sample =  ((lfsr & 0x01) == 0) ? gain : -gain;
-                        nSample++;
                         break;
                     
                     default:
@@ -179,7 +174,7 @@ namespace ZarthGB
             if (envelopePeriod != 0)
             {
                 if (periodTimer > 0)
-                    periodTimer -= 1;
+                    periodTimer--;
 
                 if (periodTimer == 0)
                 {
@@ -199,7 +194,7 @@ namespace ZarthGB
         private void ApplySweep()
         {
             if (sweepTimer > 0) 
-                sweepTimer -= 1;
+                sweepTimer--;
 
             if (sweepTimer == 0)
             {
@@ -235,7 +230,7 @@ namespace ZarthGB
             
             // overflow check
             if (newFrequency > 2047)
-                currentVolume = 0;  // It should be stop channel completely
+                currentVolume = 0;  // It should stop the channel completely
 
             return newFrequency;
         }

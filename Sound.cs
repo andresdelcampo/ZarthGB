@@ -13,7 +13,8 @@ namespace ZarthGB
 {
     class Sound
     {
-        public const int PlayStep = 64;
+        public const int PlayStep = 32;
+        public const int DesiredLatency = 160;
 
         private Memory memory;
         private const int SampleRate = 192000;    // Minimum 192kHz to get enough frequency resolution -else sounds distorted
@@ -55,8 +56,8 @@ namespace ZarthGB
         
         #region Sound1
         private GBSignalGenerator signal1;
-        private BufferedWaveProvider waveBuffer1;
-        private Dictionary<string, byte[]> bufferCache1 = new Dictionary<string, byte[]>();
+        private readonly BufferedWaveProvider waveBuffer1;
+        private readonly byte[] buffer1 = new byte[SampleRate * 5];
         private byte Sweep1 => memory[0xff10];
         private int SweepShift => Sweep1 & 0x7; 
         private bool SweepAmplify => (Sweep1 & 0x8) == 0;
@@ -64,7 +65,7 @@ namespace ZarthGB
         private byte WaveLength1 => memory[0xff11];
         private int WaveDuty1 => WaveLength1 >> 6;
         private int Length1 => (64 - (WaveLength1 & 0x3F)) * 4;
-        private int lengthPlayed1 = 0;
+        private int lengthPlayed1;
         private byte Envelope1 => memory[0xff12];
         private double Volume1 => (Envelope1 >> 4) / 15.0;
         private bool EnvelopeAmplify1 => (Envelope1 & 0x8) != 0;
@@ -105,7 +106,7 @@ namespace ZarthGB
                         SweepAmplify = SweepAmplify,
                         SweepShift = SweepShift,
                     };
-                    Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
+                    //Debug.Print($"QUEUE SWEEP Amplify {SweepAmplify}, Period {SweepPeriod}, Shift {SweepShift}");
                 }
                 
                 SetSound1On();
@@ -129,12 +130,12 @@ namespace ZarthGB
 
         #region Sound2
         private GBSignalGenerator signal2;
-        private BufferedWaveProvider waveBuffer2;
-        private Dictionary<string, byte[]> bufferCache2 = new Dictionary<string, byte[]>();
+        private readonly BufferedWaveProvider waveBuffer2;
+        private readonly byte[] buffer2 = new byte[SampleRate * 5];
         private byte WaveLength2 => memory[0xff16];
         private int WaveDuty2 => WaveLength2 >> 6;
         private int Length2 => (64 - (WaveLength2 & 0x3F)) * 4;
-        private int lengthPlayed2 = 0;
+        private int lengthPlayed2;
         private byte Envelope2 => memory[0xff17];
         private double Volume2 => (Envelope2 >> 4) / 15.0;
         private bool EnvelopeAmplify2 => (Envelope2 & 0x8) != 0;
@@ -178,11 +179,11 @@ namespace ZarthGB
 
         #region Sound3
         private GBSignalGenerator signal3;
-        private BufferedWaveProvider waveBuffer3;
-        private Dictionary<string, byte[]> bufferCache3 = new Dictionary<string, byte[]>();
+        private readonly BufferedWaveProvider waveBuffer3;
+        private readonly byte[] buffer3 = new byte[SampleRate * 5];
         private bool SoundOn3 => (memory[0xff1a] & 0x7) != 0;
         private int Length3 => 256 - memory[0xff1b];
-        private int lengthPlayed3 = 0;
+        private int lengthPlayed3;
         private int OutputLevel3 => (memory[0xff1c] & 0x60) >> 5;
         private bool TriggerSound3 => (memory[0xff1e] >> 7) != 0;
         private int Frequency3 => (memory[0xff1e] & 7) << 8 | memory[0xff1d];        
@@ -254,10 +255,10 @@ namespace ZarthGB
         #region Sound4
 
         private GBSignalGenerator signal4;
-        private BufferedWaveProvider waveBuffer4;
-        private Dictionary<string, byte[]> bufferCache4 = new Dictionary<string, byte[]>();
+        private readonly BufferedWaveProvider waveBuffer4;
+        private readonly byte[] buffer4 = new byte[SampleRate * 5];
         private int Length4 => (64 - (memory[0xff20] & 0x3F)) * 4;
-        private int lengthPlayed4 = 0;
+        private int lengthPlayed4;
         private byte Envelope4 => memory[0xff21];
         private double Volume4 => (Envelope4 >> 4) / 15.0;
         private bool EnvelopeAmplify4 => (Envelope4 & 0x8) != 0;
@@ -349,7 +350,7 @@ namespace ZarthGB
             mixer.ConnectInputToOutput(1, 1);
 
             waveOut = new WaveOut();
-            waveOut.DesiredLatency = (int) (PlayStep * 3);    // Greater or equal to PlayStep * 2, less than PlayStep * 4 
+            waveOut.DesiredLatency = DesiredLatency; 
             waveOut.Init(mixer);
         }
 
@@ -362,7 +363,8 @@ namespace ZarthGB
         {
             TimeSpan elapsed = stopwatch.Elapsed - lastTime;
             lastTime = stopwatch.Elapsed;
-            int playStep = elapsed.Milliseconds << 1;
+            //int playStep = elapsed.Milliseconds << 1;
+            int playStep = PlayStep;
             
             Debug.Print($"Sound: {playStep} / {PlayStep}, {waveOut.PlaybackState}");
             Debug.Print($"Buffer1: {waveBuffer1.BufferedDuration.Milliseconds}, Buffer2: {waveBuffer2.BufferedDuration.Milliseconds}, Buffer3: {waveBuffer3.BufferedDuration.Milliseconds}, Buffer4: {waveBuffer4.BufferedDuration.Milliseconds}, ");
@@ -373,23 +375,9 @@ namespace ZarthGB
                 var playLength = (Loop1 || (lengthPlayed1 + playStep) <= Length1) ? playStep : Length1 - lengthPlayed1;
                 if (playLength > 0)
                 {
-                    byte[] buffer;
-                    int bytes;
-                    string key = $"{playLength}-{Frequency1}-{WaveDuty1}-{EnvelopeAmplify1}-{EnvelopePeriod1}-{SweepAmplify}-{SweepPeriod}-{SweepShift}-{Volume1}";
-
-                    if (!Loop1 && bufferCache1.ContainsKey(key))
-                    {
-                        buffer = bufferCache1[key];
-                        bytes = buffer.Length;
-                    }
-                    else
-                    {
-                        buffer = new byte[waveBuffer1.WaveFormat.AverageBytesPerSecond * playLength / 1000];
-                        var sample = signal1.Take(TimeSpan.FromMilliseconds(playLength));
-                        bytes = sample.ToWaveProvider().Read(buffer, 0, buffer.Length);
-                        bufferCache1[key] = buffer;
-                    }
-                    waveBuffer1.AddSamples(buffer, 0, bytes);
+                    var sample = signal1.Take(TimeSpan.FromMilliseconds(playLength));
+                    int bytes = sample.ToWaveProvider().Read(buffer1, 0, waveBuffer1.WaveFormat.AverageBytesPerSecond * playLength / 1000);
+                    waveBuffer1.AddSamples(buffer1, 0, bytes);
                     lengthPlayed1 += playLength;
                     
                     if (!Loop1) SetSound1Off();
@@ -405,23 +393,9 @@ namespace ZarthGB
                 var playLength = (Loop2 || (lengthPlayed2 + playStep) <= Length2) ? playStep : Length2 - lengthPlayed2;
                 if (playLength > 0)
                 {
-                    byte[] buffer;
-                    int bytes;
-                    string key = $"{playLength}-{Frequency2}-{WaveDuty2}-{EnvelopeAmplify2}-{EnvelopePeriod2}-{Volume2}";
-
-                    if (!Loop2 && bufferCache2.ContainsKey(key))
-                    {
-                        buffer = bufferCache2[key];
-                        bytes = buffer.Length;
-                    }
-                    else
-                    {
-                        buffer = new byte[waveBuffer2.WaveFormat.AverageBytesPerSecond * playLength / 1000];
-                        var sample = signal2.Take(TimeSpan.FromMilliseconds(playLength));
-                        bytes = sample.ToWaveProvider().Read(buffer, 0, buffer.Length);
-                        bufferCache2[key] = buffer;
-                    }
-                    waveBuffer2.AddSamples(buffer, 0, bytes);
+                    var sample = signal2.Take(TimeSpan.FromMilliseconds(playLength));
+                    int bytes = sample.ToWaveProvider().Read(buffer2, 0, waveBuffer2.WaveFormat.AverageBytesPerSecond * playLength / 1000);
+                    waveBuffer2.AddSamples(buffer2, 0, bytes);
                     lengthPlayed2 += playLength;
                     
                     if (!Loop2) SetSound2Off();
@@ -437,23 +411,9 @@ namespace ZarthGB
                 var playLength = (Loop3 || (lengthPlayed3 + playStep) <= Length3) ? playStep : Length3 - lengthPlayed3;
                 if (playLength > 0)
                 {
-                    byte[] buffer;
-                    int bytes;
-                    string key = $"{playLength}-{Frequency3}-{OutputLevel3}-{Samples.Sum()}";
-    
-                    if (!Loop3 && bufferCache3.ContainsKey(key))
-                    {
-                        buffer = bufferCache3[key];
-                        bytes = buffer.Length;
-                    }
-                    else
-                    {
-                        buffer = new byte[waveBuffer3.WaveFormat.AverageBytesPerSecond * playLength / 1000];
-                        var sample = signal3.Take(TimeSpan.FromMilliseconds(playLength));
-                        bytes = sample.ToWaveProvider().Read(buffer, 0, buffer.Length);
-                        bufferCache3[key] = buffer;
-                    }
-                    waveBuffer3.AddSamples(buffer, 0, bytes);
+                    var sample = signal3.Take(TimeSpan.FromMilliseconds(playLength));
+                    int bytes = sample.ToWaveProvider().Read(buffer3, 0, waveBuffer3.WaveFormat.AverageBytesPerSecond * playLength / 1000);
+                    waveBuffer3.AddSamples(buffer3, 0, bytes);
                     lengthPlayed3 += playLength;
  
                     if (!Loop3) SetSound3Off();
@@ -469,23 +429,9 @@ namespace ZarthGB
                 var playLength = (Loop4 || (lengthPlayed4 + playStep) <= Length4) ? playStep : Length4 - lengthPlayed4;
                 if (playLength > 0)
                 {
-                    byte[] buffer;
-                    int bytes;
-                    string key = $"{playLength}-{EnvelopeAmplify4}-{EnvelopePeriod4}-{Volume4}-{CounterShift}-{CounterWidthMode}-{CounterDividingRatio}";
-            
-                    if (!Loop4 && bufferCache4.ContainsKey(key))
-                    {
-                        buffer = bufferCache4[key];
-                        bytes = buffer.Length;
-                    }
-                    else
-                    {
-                        buffer = new byte[waveBuffer4.WaveFormat.AverageBytesPerSecond * playLength / 1000];
-                        var sample = signal4.Take(TimeSpan.FromMilliseconds(playLength));
-                        bytes = sample.ToWaveProvider().Read(buffer, 0, buffer.Length);
-                        bufferCache4[key] = buffer;
-                    }
-                    waveBuffer4.AddSamples(buffer, 0, bytes);
+                    var sample = signal4.Take(TimeSpan.FromMilliseconds(playLength));
+                    int bytes = sample.ToWaveProvider().Read(buffer4, 0, waveBuffer4.WaveFormat.AverageBytesPerSecond * playLength / 1000);
+                    waveBuffer4.AddSamples(buffer4, 0, bytes);
                     lengthPlayed4 += playLength;
                     
                     if (!Loop4) SetSound4Off();
