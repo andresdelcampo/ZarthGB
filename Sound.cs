@@ -13,7 +13,8 @@ namespace ZarthGB
 {
     class Sound
     {
-        public const int PlayStep = 64;
+        public const int PlayStep = 16;  // In ms
+        public const int DesiredLatency = 160;      // PS 8 -> DL 156
 
         private Memory memory;
         private const int SampleRate = 192000;    // Minimum 192kHz to get enough frequency resolution -else sounds distorted
@@ -349,7 +350,7 @@ namespace ZarthGB
             mixer.ConnectInputToOutput(1, 1);
 
             waveOut = new WaveOut();
-            waveOut.DesiredLatency = (int) (PlayStep * 3);    // Greater or equal to PlayStep * 2, less than PlayStep * 4 
+            waveOut.DesiredLatency = DesiredLatency; 
             waveOut.Init(mixer);
         }
 
